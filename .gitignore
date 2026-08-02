@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Conda
+.conda/
+conda-meta/
+pkgs/
+
+# Environment files
+.env
+
+# Local data / vector stores
+data/
+*.db
+*.sqlite
+*.sqlite3
+*.faiss
+*.index
+chroma/
+.chroma/
+vector_store/
+*.pkl
+*.npy
+*.npz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,0 +1,5 @@
+langchain
+langgraph
+langchain-community
+python-dotenv
+feedparser
