@@ -1,0 +1,97 @@
+
+sources:
+
+  - name: OpenAI Blog
+    type: rss
+    url: https://openai.com/blog/rss.xml
+    language: en
+    category:
+      - Research
+      - Industry
+
+  - name: Hugging Face Blog
+    type: rss
+    url: https://huggingface.co/blog/feed.xml
+    language: en
+    category:
+      - OpenSource
+      - AI
+
+  - name: arXiv AI
+    type: rss
+    url: https://export.arxiv.org/rss/cs.AI
+    language: en
+    category:
+      - Research
+
+  - name: TechCrunch AI
+    type: rss
+    url: https://techcrunch.com/category/artificial-intelligence/feed
+    language: en
+    category:
+      - Industry
+      - Media
+
+  - name: Hacker News (frontpage)
+    type: rss
+    url: https://hnrss.org/frontpage?count=30
+    language: en
+    category:
+      - Community
+      - Aggregator
+
+  - name: 机器之心
+    type: rss
+    url: https://www.jiqizhixin.com/rss
+    language: zh
+    category:
+      - Industry
+      - Media
+
+  - name: 量子位
+    type: rss
+    url: https://www.qbitai.com/feed
+    language: zh
+    category:
+      - Industry
+      - Media
+
+  - name: 36氪
+    type: rss
+    url: https://36kr.com/feed
+    language: zh
+    category:
+      - Industry
+      - Tech
+
+  - name: 雷锋网
+    type: rss
+    url: https://www.leiphone.com/feed
+    language: zh
+    category:
+      - Industry
+      - Media
+
+  - name: 虎嗅
+    type: rss
+    url: https://www.huxiu.com/rss/0.xml
+    language: zh
+    category:
+      - Industry
+      - Media
+
+  - name: 极客公园
+    type: rss
+    url: https://www.geekpark.net/rss
+    language: zh
+    category:
+      - Tech
+      - Community
+
+  - name: 腾讯云+社区
+    type: rss
+    url: https://cloud.tencent.com/feed
+    language: zh
+    category:
+      - Community
+      - Tech

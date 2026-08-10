@@ -17,6 +17,8 @@ pkgs/
 
 # Environment files
 .env
+*.env
+.env.*
 
 # Local data / vector stores
 data/
