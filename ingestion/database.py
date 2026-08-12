@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 
 
-DB_PATH = Path("storage/AInews.db")
+DB_PATH = Path("storage/news.db")
 
 
 def get_connection():

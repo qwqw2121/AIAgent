@@ -1,0 +1,50 @@
+sources:
+  # ===== 海外实验室/公司官方博客(已核实为官方RSS) =====
+  - name: OpenAI Blog
+    type: rss
+    url: https://openai.com/news/rss.xml
+    language: en
+    category:
+      - Research
+      - Industry
+
+  - name: Google DeepMind Blog
+    type: rss
+    url: https://deepmind.google/blog/feed/basic/
+    language: en
+    category:
+      - Research
+
+  - name: Hugging Face Blog
+    type: rss
+    url: https://huggingface.co/blog/feed.xml
+    language: en
+    category:
+      - Open Source
+      - Industry
+
+  # ===== 学术论文源(官方) =====
+  - name: arXiv cs.AI
+    type: rss
+    url: http://export.arxiv.org/rss/cs.AI
+    language: en
+    category:
+      - Research
+      - Papers
+
+  # ===== 科技媒体AI专栏(官方RSS,非自媒体) =====
+  - name: MIT Technology Review AI
+    type: rss
+    url: https://www.technologyreview.com/topic/artificial-intelligence/feed/
+    language: en
+    category:
+      - Industry
+      - Analysis
+
+  - name: The Verge AI
+    type: rss
+    url: https://www.theverge.com/rss/ai-artificial-intelligence/index.xml
+    language: en
+    category:
+      - Industry
+      - Product
