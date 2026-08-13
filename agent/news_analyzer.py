@@ -8,7 +8,7 @@ import os
 import time
 import sqlite3
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Sequence, Union
 
 try:
     from openai import OpenAI
@@ -41,28 +41,32 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
-def fetch_by_status(conn: sqlite3.Connection, status: str, limit: int = None) -> List[Dict[str, Any]]:
+def fetch_by_status(conn: sqlite3.Connection, status: Union[str, Sequence[str]], limit: int = None) -> List[Dict[str, Any]]:
     """
-    获取指定状态的记录，默认排除 is_duplicate=1 的重复记录
+    获取指定状态的记录，默认排除 is_duplicate=1 的重复记录。
+    支持单个状态或多个状态（如 ('extracted', 'analyze_failed')）。
     """
     cursor = conn.cursor()
-    
-    query = """
+
+    statuses = [status] if isinstance(status, str) else list(status)
+    placeholders = ', '.join(['?'] * len(statuses))
+
+    query = f"""
         SELECT id, url, title, content, summary, source, 
                published, published_ts, crawl_time, status
         FROM news 
-        WHERE status = ? AND is_duplicate = 0
+        WHERE status IN ({placeholders}) AND is_duplicate = 0
         ORDER BY published_ts DESC
     """
-    
+
     if limit:
         query += f" LIMIT {limit}"
-    
-    cursor.execute(query, (status,))
-    
+
+    cursor.execute(query, tuple(statuses))
+
     columns = [description[0] for description in cursor.description]
     rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-    
+
     return rows
 
 
@@ -101,27 +105,27 @@ def analyze_news(title: str, content: str) -> dict:
     content = content[:MAX_CONTENT_CHARS]
     
     prompt = f"""
-你是AI资讯分析专家。
-分析下面新闻：
-标题:
-{title}
-正文:
-{content}
-输出JSON:
-{{
-"summary": "",
-"category": "",
-"keywords": [],
-"importance": 1
-}}
-要求：
-- summary控制在80-120字，突出新闻的核心事实和影响
-- category从以下选择: 大模型发布|融资并购|政策监管|研究论文|产品发布|行业观点|其他
-- keywords 3-5个
-- importance范围1-10，10代表行业级重大事件(如头部公司发布新一代模型)，1代表边角小消息
-- summary必须是你对新闻事件的概括性转述，不能是原文的同义词替换或句式微调
-- 严禁逐句改写原文表述，要用你自己的语言重新组织信息
-"""
+            你是AI资讯分析专家。
+            分析下面新闻：
+            标题:
+            {title}
+            正文:
+            {content}
+            输出JSON:
+            {{
+            "summary": "",
+            "category": "",
+            "keywords": [],
+            "importance": 1
+            }}
+            要求：
+            - summary控制在80-120字，突出新闻的核心事实和影响
+            - category从以下选择: 大模型发布|融资并购|政策监管|研究论文|产品发布|行业观点|其他
+            - keywords 3-5个
+            - importance范围1-10，10代表行业级重大事件(如头部公司发布新一代模型)，1代表边角小消息
+            - summary必须是你对新闻事件的概括性转述，不能是原文的同义词替换或句式微调
+            - 严禁逐句改写原文表述，要用你自己的语言重新组织信息
+            """
     
     response = client.chat.completions.create(
         model="glm-4.7-flash",
@@ -144,14 +148,14 @@ def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
     conn = get_connection()
     
     try:
-        # 获取待分析的记录
-        rows = fetch_by_status(conn, status="extracted", limit=limit)
-        
+        # 获取待分析的记录，包括之前分析失败但可重试的新闻
+        rows = fetch_by_status(conn, status=("extracted", "analyze_failed"), limit=limit)
+
         if not rows:
-            print("✅ 没有待分析的新闻")
+            print("✅ 没有待分析或可重试的新闻")
             return
-        
-        print(f"📊 待LLM分析: {len(rows)} 条")
+
+        print(f"📊 待LLM分析/重试: {len(rows)} 条")
         
         success_count = 0
         fail_count = 0
