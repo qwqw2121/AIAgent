@@ -52,3 +52,20 @@ python tests/retrieval_eval.py
 - `original_url` 原文链接
 
 完整 SQL 见 [news_schema.sql](storage/news_schema.sql)。
+
+## 增量事件聚类。
+新新闻
+ ↓
+LLM分析
+ ↓
+Embedding
+ ↓
+与已有事件比较
+ ↓
+相似度高
+    ↓
+加入已有事件
+
+相似度低
+    ↓
+创建新事件
