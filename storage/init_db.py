@@ -14,6 +14,17 @@ def init_db():
 
     # 开启外键约束
     cursor.execute("PRAGMA foreign_keys = ON")
+    
+    # ---------- 每日新闻总结 ----------
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS daily_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        report_date TEXT UNIQUE NOT NULL,
+        overview TEXT,
+        report_json TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+""")
 
     # # ============================================================
     # # 1. 新闻主表 news
@@ -94,20 +105,20 @@ def init_db():
     # 不再保存 embedding BLOB。
     #
 
-    cursor.execute("""
-    CREATE TABLE IF NOT EXISTS news_embeddings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        news_id INTEGER UNIQUE NOT NULL,
-        vector_id TEXT UNIQUE NOT NULL,
-        model_name TEXT NOT NULL,
-        vector_db TEXT DEFAULT 'chroma',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    # cursor.execute("""
+    # CREATE TABLE IF NOT EXISTS news_embeddings (
+    #     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    #     news_id INTEGER UNIQUE NOT NULL,
+    #     vector_id TEXT UNIQUE NOT NULL,
+    #     model_name TEXT NOT NULL,
+    #     vector_db TEXT DEFAULT 'chroma',
+    #     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
 
-        FOREIGN KEY (news_id)
-            REFERENCES news(id)
-            ON DELETE CASCADE
-    )
-    """)
+    #     FOREIGN KEY (news_id)
+    #         REFERENCES news(id)
+    #         ON DELETE CASCADE
+    # )
+    # """)
 
     # ============================================================
     # 5. 新闻聚类表 news_clusters

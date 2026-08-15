@@ -10,6 +10,7 @@ import sqlite3
 import calendar
 from pathlib import Path
 from datetime import datetime
+from datetime import datetime, timezone
 
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "storage/news.db"
@@ -69,7 +70,8 @@ def in_target_month(entry):
     if not parsed:
         return False, None
     ts = calendar.timegm(parsed)  # UTC时间戳,比字符串比较更可靠
-    dt = datetime.utcfromtimestamp(ts)
+    # dt = datetime.utcfromtimestamp(ts)
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     return (dt.year == TARGET_YEAR and dt.month == TARGET_MONTH), ts
 
 
@@ -92,7 +94,15 @@ def crawl(source):
         ok, ts = in_target_month(item)
         if not ok:
             continue  # 跳过非目标月份
-
+        # 生成 ISO 8601 格式
+        parsed = item.get("published_parsed")
+        if parsed:
+            # ✅ 使用 fromtimestamp 替代 utcfromtimestamp
+            dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+            iso_time = dt.isoformat(timespec='seconds').replace('+00:00', '+00:00')
+        else:
+            iso_time = ""
+            
         title = clean_html(item.get("title", ""))
         summary = clean_html(item.get("summary", ""))
 
@@ -106,7 +116,7 @@ def crawl(source):
             "source": source["name"],
             "language": source["language"],
             "category": normalize_category(source.get("category")),
-            "published": item.get("published", ""),
+            "published": iso_time,
             "published_ts": ts,
             "crawl_time": datetime.now().isoformat(),
             "title_hash": title_hash(title),
