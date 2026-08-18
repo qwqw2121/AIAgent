@@ -99,3 +99,19 @@ ai-news-agent/
 ├── .gitignore
 ├── README.md
 └── requirements.txt
+
+daily_news_flow
+│
+├── crawl_task
+│
+├── extract_task
+│
+├── analyze_task
+│
+├── embedding_task
+│
+├── dedup_task
+│
+├── clustering_task
+│
+└── report_task

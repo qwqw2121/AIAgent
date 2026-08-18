@@ -19,7 +19,8 @@ import importlib
 import trafilatura
 from pathlib import Path
 
-DB_PATH = Path("storage/news.db")
+BASE_DIR = Path(__file__).parent.parent
+DB_PATH = BASE_DIR / "storage/news.db"  # ✅ 相对于文件位置，稳定
 
 MIN_CONTENT_LEN = 80       # 正文短于这个长度,视为提取失败(反爬页/空页面常见现象)
 SLEEP_SEC = 1.0            # 每条之间的间隔,防止被目标网站封IP
@@ -130,7 +131,8 @@ def run():
         time.sleep(SLEEP_SEC)
 
     conn.close()
-    print("正文提取完成")
+    # print("正文提取完成")
+    return {"total": len(rows), "success": ok, "failed": failed}   # ⭐ 新增返回值
 
 
 if __name__ == "__main__":

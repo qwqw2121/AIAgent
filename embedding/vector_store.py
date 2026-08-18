@@ -14,9 +14,10 @@ import chromadb
 # =========================
 # 配置
 # =========================
-
-VECTOR_DB_PATH = Path("storage/vector_db")
-
+BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"
+VECTOR_DB_PATH = BASE_DIR / "storage/vector_db"
+# DB_PATH = Path("storage/news.db") #绝对路径
 
 class VectorStore:
     """

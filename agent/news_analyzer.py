@@ -45,6 +45,7 @@ def fetch_by_status(conn: sqlite3.Connection, status: Union[str, Sequence[str]],
     """
     获取指定状态的记录，默认排除 is_duplicate=1 的重复记录。
     支持单个状态或多个状态（如 ('extracted', 'analyze_failed')）。
+    ("deduped", "analyze_failed")
     """
     cursor = conn.cursor()
 
@@ -148,8 +149,8 @@ def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
     conn = get_connection()
     
     try:
-        # 获取待分析的记录，包括之前分析失败但可重试的新闻
-        rows = fetch_by_status(conn, status=("extracted", "analyze_failed"), limit=limit)
+        # 获取待分析的记录，包括之前分析失败但可重试的新闻 提取后extracted-》去重后deduped
+        rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
 
         if not rows:
             print("✅ 没有待分析或可重试的新闻")
@@ -203,12 +204,12 @@ def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
             if i < len(rows):
                 time.sleep(sleep_sec)
         
-        # 统计结果
-        print(f"\n📊 分析完成统计:")
-        print(f"  ✅ 成功: {success_count}")
-        print(f"  ❌ 失败: {fail_count}")
-        print(f"  📝 总计: {len(rows)}")
-        
+        # # 统计结果
+        # print(f"\n📊 分析完成统计:")
+        # print(f"  ✅ 成功: {success_count}")
+        # print(f"  ❌ 失败: {fail_count}")
+        # print(f"  📝 总计: {len(rows)}")
+        return {"total": len(rows), "success": success_count, "failed": fail_count}  # ⭐ 新增
     finally:
         conn.close()
 

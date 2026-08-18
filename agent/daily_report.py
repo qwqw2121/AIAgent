@@ -24,7 +24,11 @@ load_dotenv()
 # 配置
 # =========================================================
 
-DB_PATH = Path("storage/news.db")
+
+# 设置路径
+# DB_PATH = Path("storage/news.db") #绝对路径
+BASE_DIR = Path(__file__).parent.parent
+DB_PATH = BASE_DIR / "storage/news.db"
 
 # 使用 OpenAI 或 OpenAI-compatible API
 API_KEY = os.getenv(
@@ -76,7 +80,6 @@ def init_daily_report_table():
 
 from email.utils import parsedate_to_datetime
 
-
 def get_news_by_date(report_date):
     """
     根据日期获取新闻。
@@ -111,42 +114,19 @@ def get_news_by_date(report_date):
     conn.close()
 
     news_list = []
-
     for row in rows:
+        (news_id, title, source, published, summary, category,
+        keywords, importance, url, status, is_duplicate) = row
 
-        (
-            news_id,
-            title,
-            source,
-            published,
-            summary,
-            category,
-            keywords,
-            importance,
-            url,
-            status,
-            is_duplicate
-        ) = row
-
-        # ----------------------------------
-        # 解析 RSS 时间
-        # ----------------------------------
-
-        try:
-            dt = parsedate_to_datetime(published)
-
-            news_date = dt.date().isoformat()
-
-        except Exception as e:
-
-            print(
-                f"⚠️ 日期解析失败: "
-                f"id={news_id}, "
-                f"published={published}, "
-                f"error={e}"
-            )
-
+        if not published:
             continue
+        try:
+            dt = datetime.fromisoformat(published)   # ✅ 改这里
+            news_date = dt.date().isoformat()
+        except Exception as e:
+            print(f"⚠️ 日期解析失败: id={news_id}, published={published}, error={e}")
+            continue
+    
 
         # ----------------------------------
         # 判断日期

@@ -15,7 +15,12 @@ similarity < 0.75
       ↓
 创建新事件
 '''
-
+'''待修复：问题5（次要）：每条新闻单独开关一次 SQLite 
+连接——find_event_by_news、get_event_news、update_event、add_news_to_event、create_new_event 
+每个函数内部都是"开连接→查询/写入→关闭"。在 process_news 一次调用里，可能连续开关 3-4 次连接，
+如果新闻量大（比如一次增量处理几百条），这个开销会比较明显。可以优化成连接复用，
+但这是性能优化，不是正确性问题，暂时不阻塞你接入 Task，可以先跑起来再看要不要优化。
+'''
 # embedding/incremental_event.py
 
 import sqlite3
@@ -23,12 +28,8 @@ from pathlib import Path
 
 from vector_store import VectorStore
 
-
-DB_PATH = (
-    Path(__file__).parent.parent
-    / "storage"
-    / "news.db"
-)
+BasePath = Path(__file__).parent.parent
+DB_PATH = BasePath / "storage/news.db"
 
 # 事件匹配阈值
 EVENT_THRESHOLD = 0.75
@@ -377,8 +378,8 @@ def process_news(news_id):
 
     # --------------------------------------------------------
     # 找到已有事件
+    '''事件匹配逻辑在"多个候选事件"时的选择策略，可能导致同一事件被拆分成多个'''
     # --------------------------------------------------------
-
     if event_candidates:
 
         event_id, similarity = max(
@@ -392,6 +393,8 @@ def process_news(news_id):
             similarity
         )
 
+        _mark_clustered(news_id)   # ⭐ 新增
+        
         print(
             f"news_id={news_id}"
             f" → Event {event_id}"
@@ -413,14 +416,20 @@ def process_news(news_id):
         f" → 创建新事件 Event {event_id}"
     )
 
+    _mark_clustered(news_id)   # ⭐ 新增无论归入已有事件还是新建事件，处理完都要推进
     return event_id
 
+def _mark_clustered(news_id):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("UPDATE news SET status = 'clustered' WHERE id = ?", (news_id,))
+    conn.commit()
+    conn.close()
 
 # ============================================================
 # 处理所有 analyzed / embedded 新闻
 # ============================================================
 
-def main():
+def run():
 
     conn = sqlite3.connect(DB_PATH)
 
@@ -445,7 +454,7 @@ def main():
     print(
         f"待匹配事件新闻：{len(news_ids)}"
     )
-
+    new_events, joined_existing, failed = 0, 0, 0
     for news_id in news_ids:
 
         try:
@@ -459,8 +468,13 @@ def main():
             print(
                 f"[失败] news_id={news_id}: {e}"
             )
-
+    return {   # ⭐ 新增返回值
+        "total": len(news_ids),
+        "new_events": new_events,
+        "joined_existing": joined_existing,
+        "failed": failed,
+    }
 
 if __name__ == "__main__":
 
-    main()
+    run()

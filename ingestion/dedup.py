@@ -48,7 +48,8 @@ def dedup_exact(conn):
     """按 title_hash 精确去重,同hash只留id最小的一条"""
     rows = conn.execute("""
         SELECT id, title_hash FROM news
-        WHERE extract_status IN ('ok_trafilatura', 'ok_readability')
+        # WHERE extract_status IN ('ok_trafilatura', 'ok_readability')
+        WHERE status IN ('extracted')
           AND is_duplicate = 0
     """).fetchall()
 
@@ -119,6 +120,13 @@ def dedup_fuzzy(conn):
     conn.commit()
     print(f"模糊去重(标题相似度): 标记 {dup_count} 条重复")
 
+def mark_deduped(conn):
+    """去重完成后，把未被标记为重复的记录状态推进到 deduped"""
+    conn.execute("""
+        UPDATE news SET status = 'deduped'
+        WHERE status = 'extracted' AND is_duplicate = 0
+    """)
+    conn.commit()
 
 def run():
     conn = sqlite3.connect(DB_PATH)
@@ -126,7 +134,7 @@ def run():
 
     dedup_exact(conn)   # 先做精确去重,减少后面模糊比较的数据量
     dedup_fuzzy(conn)
-
+    mark_deduped(conn)   # ⭐ 新增
     conn.close()
     print("去重完成")
 

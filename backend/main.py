@@ -178,3 +178,12 @@ def get_daily_report_range(
         for row in rows
     ]
 
+import uvicorn
+# 关键：必须有这一段
+if __name__ == "__main__":
+    uvicorn.run(
+        "backend.main:app",  # 或者直接用 app 对象
+        host="0.0.0.0",
+        port=8000,
+        reload=True
+    )

@@ -25,7 +25,7 @@ from pathlib import Path
 import time
 
 from FlagEmbedding import BGEM3FlagModel
-from vector_store import VectorStore
+from  embedding.vector_store import VectorStore
 
 # =====================================================
 # 强制使用 CPU（解决 CUDA 不兼容问题）
@@ -40,26 +40,27 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''  # 禁用 GPU
 MODEL_PATH = "/mnt/d/AI_Models/bge-m3"
 DB_PATH = Path(__file__).parent.parent / "storage/news.db"
 
+model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")  # 在 import 时就执行
 print(f"🔄 正在从本地加载 BGE-M3 模型...")
 print(f"   路径: {MODEL_PATH}")
 print(f"   设备: CPU (强制)")
 
 # =====================================================
-# 加载模型（使用 CPU）
+# 加载模型（使用 CPU）不管你要不要调用里面的函数，都会触发模型加载（BGE-M3 加载通常要几秒到几十秒）。
+# 这在 Prefect flow 运行时问题不大（反正这个环节本来就要用模型），
+# 但会拖慢任何"只是想调用别的函数做测试/调试"的场景，
+# 也会导致单元测试这个模块变得很重。建议改成“懒加载单例”：
 # =====================================================
 
-try:
-    model = BGEM3FlagModel(
-        MODEL_PATH,
-        use_fp16=False,      # CPU 不支持 fp16
-        device="cpu"         # 强制使用 CPU
-    )
-    print("✅ BGE-M3 模型加载完成 (CPU 模式)")
-except Exception as e:
-    print(f"❌ 模型加载失败: {e}")
-    print("请检查模型路径是否正确，或尝试重新下载模型")
-    exit(1)
+_model = None
 
+def get_model():
+    global _model
+    if _model is None:
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''
+        print("🔄 正在加载 BGE-M3 模型...")
+        _model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")
+    return _model
 # =====================================================
 # 初始化向量存储
 # =====================================================
@@ -107,7 +108,7 @@ def get_embedding(text: str):
     
     try:
         # ✅ BGE-M3 返回字典
-        result = model.encode(text)
+        result = get_model().encode(text)
         
         # ✅ 调试：查看返回类型
         print(f"🔍 result 类型: {type(result)}")
@@ -200,7 +201,7 @@ def test_embedding():
 # 主流程
 # =====================================================
 
-def main():
+def run():
     """主流程：生成所有新闻的向量"""
     
     # 测试 Embedding
@@ -271,13 +272,14 @@ def main():
         time.sleep(0.5)
     
     # 统计结果
-    print(f"\n{'='*60}")
-    print(f"📊 Embedding 任务完成")
-    print(f"  ✅ 成功: {success_count} 条")
-    print(f"  ❌ 失败: {fail_count} 条")
-    print(f"  ⏭️ 跳过: {skip_count} 条")
-    print(f"  📝 总计: {len(news_list)} 条")
+    # print(f"\n{'='*60}")
+    # print(f"📊 Embedding 任务完成")
+    # print(f"  ✅ 成功: {success_count} 条")
+    # print(f"  ❌ 失败: {fail_count} 条")
+    # print(f"  ⏭️ 跳过: {skip_count} 条")
+    # print(f"  📝 总计: {len(news_list)} 条")
+    return {"total": len(news_list), "success": success_count, "failed": fail_count, "skipped": skip_count}
 
 
 if __name__ == "__main__":
-    main()
+    run()

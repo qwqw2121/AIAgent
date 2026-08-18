@@ -9,7 +9,7 @@ import numpy as np
 
 from sklearn.cluster import DBSCAN
 
-from vector_store import VectorStore
+from  embedding.vector_store import VectorStore
 
 
 # =========================

@@ -85,13 +85,26 @@ def normalize_category(category):
         return ",".join(category)
     return category or ""
 
+def in_target_month(entry, target_year: int, target_month: int):
+    parsed = entry.get("published_parsed")
+    if not parsed:
+        return False, None
+    ts = calendar.timegm(parsed)
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    return (dt.year == target_year and dt.month == target_month), ts
 
-def crawl(source):
+
+def crawl(source, target_year: int, target_month: int):
     feed = feedparser.parse(source["url"])
     results = []
-
     for item in feed.entries:
-        ok, ts = in_target_month(item)
+        ok, ts = in_target_month(item, target_year, target_month)
+# def crawl(source):
+#     feed = feedparser.parse(source["url"])
+#     results = []
+
+#     for item in feed.entries:
+#         ok, ts = in_target_month(item)
         if not ok:
             continue  # 跳过非目标月份
         # 生成 ISO 8601 格式
@@ -123,47 +136,9 @@ def crawl(source):
         })
 
     return results
-
-#用 JSON 存的话,category 保留了列表结构,以后取出来可以直接 json.loads() 还原成 Python list,
-# def crawl(source):
-#     feed = feedparser.parse(source["url"])
-#     results = []
-
-#     # category 在yaml里可能是列表(如 Research/Industry),
-#     # 用json.dumps转成字符串存进SQLite,取出来时json.loads还原成list
-#     category = source["category"]
-#     if isinstance(category, list):
-#         category = json.dumps(category, ensure_ascii=False)
-#     # 如果yaml里本来就是单个字符串,也统一包成list再转json,保证存储格式一致
-#     else:
-#         category = json.dumps([category], ensure_ascii=False)
-
-#     for item in feed.entries:
-#         ok, ts = in_target_month(item)
-#         if not ok:
-#             continue
-
-#         title = clean_html(item.get("title", ""))
-#         summary = clean_html(item.get("summary", ""))
-
-#         if not title or not item.get("link"):
-#             continue
-
-#         results.append({
-#             "title": title,
-#             "summary": summary,
-#             "url": item.get("link", ""),
-#             "source": source["name"],
-#             "language": source["language"],
-#             "category": category,   # 已经是JSON字符串,如 '["Research", "Industry"]'
-#             "published": item.get("published", ""),
-#             "published_ts": ts,
-#             "crawl_time": datetime.now().isoformat(),
-#             "title_hash": title_hash(title),
-#         })
-
-#     return results
-
+'''title_hash 字段用于"标题精确去重"，但 save_to_db() 里实际生效的去重只有 url 的唯一约束
+（靠 IntegrityError 捕获），title_hash 字段目前只是存了值，并没有真正用来判断重复。
+如果目标是"同一标题不同 URL 也算重复"（比如转载文章链接不同但标题相同），需要在插入前额外查一次：'''
 def save_to_db(conn, news_list):
     inserted, skipped = 0, 0
     for news in news_list:
@@ -186,28 +161,60 @@ def save_to_db(conn, news_list):
     conn.commit()
     return inserted, skipped
 
+def run(target_year: int = None, target_month: int = None) -> dict:
+    now = datetime.now(timezone.utc)
+    target_year = target_year or now.year
+    target_month = target_month or now.month
 
-def run():
     config = load_sources()
     conn = init_db()
-    all_news = []
-    total_inserted, total_skipped = 0, 0
+    total_fetched, total_inserted, total_skipped = 0, 0, 0
+    per_source_stats = []
 
     for source in config["sources"]:
-        print("crawl:", source["name"])
-        news = crawl(source)
-        all_news.extend(news)
+        news = crawl(source, target_year, target_month)
         inserted, skipped = save_to_db(conn, news)
+        total_fetched += len(news)
         total_inserted += inserted
         total_skipped += skipped
+        per_source_stats.append({
+            "source": source["name"],
+            "fetched": len(news),
+            "inserted": inserted,
+            "skipped": skipped,
+        })
 
-    save_path = BASE_DIR / "storage/raw/news.json"
-    save_path.parent.mkdir(exist_ok=True, parents=True)
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(all_news, f, ensure_ascii=False, indent=2)
-
-    print(f"目标月份共 {len(all_news)} 条, 入库 {total_inserted}, 去重跳过 {total_skipped}")
     conn.close()
+
+    return {
+        "target_year": target_year,
+        "target_month": target_month,
+        "total_fetched": total_fetched,
+        "total_inserted": total_inserted,
+        "total_skipped": total_skipped,
+        "per_source": per_source_stats,
+    }
+# def run():
+#     config = load_sources()
+#     conn = init_db()
+#     all_news = []
+#     total_inserted, total_skipped = 0, 0
+
+#     for source in config["sources"]:
+#         print("crawl:", source["name"])
+#         news = crawl(source)
+#         all_news.extend(news)
+#         inserted, skipped = save_to_db(conn, news)
+#         total_inserted += inserted
+#         total_skipped += skipped
+
+#     save_path = BASE_DIR / "storage/raw/news.json"
+#     save_path.parent.mkdir(exist_ok=True, parents=True)
+#     with open(save_path, "w", encoding="utf-8") as f:
+#         json.dump(all_news, f, ensure_ascii=False, indent=2)
+
+#     print(f"目标月份共 {len(all_news)} 条, 入库 {total_inserted}, 去重跳过 {total_skipped}")
+#     conn.close()
 
 
 if __name__ == "__main__":
