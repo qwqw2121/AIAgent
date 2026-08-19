@@ -1,6 +1,6 @@
 # pipeline/tasks/analysis_task.py
 from prefect import task, get_run_logger
-from ingestion.analysis.news_analyzer import run as analyze_run
+from agent.news_analyzer import run as analyze_run
 from pipeline.state import PipelineState
 
 @task(name="llm-analysis", retries=1)  # 内部已有 max_retry 重试单条，外层重试次数不宜太高

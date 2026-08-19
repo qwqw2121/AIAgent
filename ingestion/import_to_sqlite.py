@@ -2,7 +2,7 @@
 
 import json
 
-from database import (
+from config.database import (
     init_db,
     insert_news
 )

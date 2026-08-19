@@ -9,7 +9,7 @@ from pathlib import Path
 
 from FlagEmbedding import BGEM3FlagModel
 
-from vector_store import VectorStore
+from  embedding.vector_store import VectorStore
 
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
 

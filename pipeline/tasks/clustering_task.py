@@ -1,10 +1,18 @@
 
 # pipeline/tasks/clustering_task.py  增量版本
+# 添加项目根目录到 Python 路径
+import os
+import sys
+
+
+project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 from prefect import task, get_run_logger
-from embedding.incremental_event import main as incremental_cluster_run
+from embedding.incremental_event import run as incremental_cluster_run
 from pipeline.state import PipelineState
 import sqlite3
-from config import DB_PATH
+from config.database import DB_PATH
 
 @task(name="incremental-clustering", retries=1)
 def clustering_task(state: PipelineState) -> PipelineState:

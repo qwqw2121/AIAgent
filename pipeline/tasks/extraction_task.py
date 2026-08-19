@@ -1,7 +1,7 @@
 # pipeline/tasks/extraction_task.py
 
 from prefect import task, get_run_logger
-from ingestion.extraction.article_extractor import run as extract_run
+from ingestion.article_extractor import run as extract_run
 from pipeline.state import PipelineState
 
 @task(name="extract-content", retries=2, retry_delay_seconds=30)

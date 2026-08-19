@@ -19,6 +19,11 @@ import importlib
 import trafilatura
 from pathlib import Path
 
+import sqlite3
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Semaphore
+
 BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "storage/news.db"  # ✅ 相对于文件位置，稳定
 
@@ -26,6 +31,10 @@ MIN_CONTENT_LEN = 80       # 正文短于这个长度,视为提取失败(反爬�
 SLEEP_SEC = 1.0            # 每条之间的间隔,防止被目标网站封IP
 FETCH_TIMEOUT = 10         # trafilatura.fetch_url底层用的是urllib,可通过config传超时
 
+
+MAX_WORKERS = 5             # 同时并发的线程数，建议先从 5-10 试起
+RATE_LIMIT_PER_SEC = 3       # 每秒最多发起几个请求，防止把自己IP打进小黑屋
+_rate_limiter = Semaphore(RATE_LIMIT_PER_SEC)
 
 def ensure_columns(conn):
     """确保 extract_status 字段存在,不存在就自动加上(方便你在老库上直接跑,不用手动改表)"""
@@ -110,28 +119,50 @@ def update_content(conn, news_id, content, extract_status):
     )
     conn.commit()
 
+def _extract_one(news_id, url):
+    """单条提取的工作单元，供线程池调用"""
+    with _rate_limiter:
+        content, status = extract_content(url)
+        time.sleep(1.0 / RATE_LIMIT_PER_SEC)  # 简单的令牌桶节流
+    return news_id, content, status
+
 def run():
     conn = sqlite3.connect(DB_PATH)
     ensure_columns(conn)
-
-    # 只选"还没处理过"的:content为空 且 extract_status为空(区分"没抓过"和"抓过但失败")
     rows = conn.execute(
-        # "SELECT id, url FROM news WHERE content IS NULL AND extract_status IS NULL"
         "SELECT id, url FROM news WHERE content IS NULL AND status = 'raw'"
     ).fetchall()
 
-    print(f"待提取正文: {len(rows)} 条")
+    ok, failed = 0, 0
 
-    for i, (news_id, url) in enumerate(rows, 1):
-        print(f"[{i}/{len(rows)}] extract: {url}")
-
-        content, status = extract_content(url)
-        update_content(conn, news_id, content, status)
-
-        time.sleep(SLEEP_SEC)
+    # #串行
+    # for i, (news_id, url) in enumerate(rows, 1):
+    #     content, status = extract_content(url)
+    #     update_content(conn, news_id, content, status)
+    #     if content:
+    #         ok += 1
+    #     else:
+    #         failed += 1
+    #     time.sleep(SLEEP_SEC)
+    
+    #改成线程池并发，同时保留限速（避免把目标网站的反爬机制打进小黑屋）：
+    # ⚠️ sqlite3 连接不是线程安全的，不能让多个线程共用同一个 conn 写入
+    # 所以写入操作统一放在主线程，工作线程只负责网络请求+抓正文
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {
+            executor.submit(_extract_one, news_id, url): news_id
+            for news_id, url in rows
+        }
+        for i, future in enumerate(as_completed(futures), 1):
+            news_id, content, status = future.result()
+            update_content(conn, news_id, content, status)   # 主线程写库
+            if content:
+                ok += 1
+            else:
+                failed += 1
+            print(f"[{i}/{len(rows)}] id={news_id} status={status}")
 
     conn.close()
-    # print("正文提取完成")
     return {"total": len(rows), "success": ok, "failed": failed}   # ⭐ 新增返回值
 
 

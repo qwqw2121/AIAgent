@@ -10,11 +10,20 @@ import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Sequence, Union
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Semaphore
+import time
+
+MAX_WORKERS = 5                 # LLM API 通常有并发限制，建议比正文提取更保守
+RATE_LIMIT_PER_SEC = 3          # 需要参考你的 API 服务商速率限制文档
+_rate_limiter = Semaphore(RATE_LIMIT_PER_SEC)
+
 try:
     from openai import OpenAI
 except ImportError as e:
     raise ImportError("缺少依赖 openai，请先安装：pip install openai") from e
 from dotenv import load_dotenv
+
 
 # 设置路径
 BASE_DIR = Path(__file__).parent.parent
@@ -137,81 +146,135 @@ def analyze_news(title: str, content: str) -> dict:
     return json.loads(response.choices[0].message.content)
 
 
-def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
-    """
-    运行LLM结构化分析
-    
-    Args:
-        sleep_sec: 每次请求间隔秒数
-        max_retry: 最大重试次数
-        limit: 限制处理数量，None表示全部
-    """
-    conn = get_connection()
-    
-    try:
-        # 获取待分析的记录，包括之前分析失败但可重试的新闻 提取后extracted-》去重后deduped
-        rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
+def _analyze_one(row, max_retry):
+    content = row.get("content") or row.get("summary") or ""
+    with _rate_limiter:
+        result = None
+        for attempt in range(max_retry + 1):
+            try:
+                result = analyze_news(row["title"], content)
+                break
+            except Exception as e:
+                print(f"  ⚠️ id={row['id']} 第{attempt+1}次调用失败: {e}")
+                if attempt < max_retry:
+                    time.sleep(2)
+        time.sleep(1.0 / RATE_LIMIT_PER_SEC)
+    return row["id"], result
 
+def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
+    conn = get_connection()
+    try:
+        rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
         if not rows:
             print("✅ 没有待分析或可重试的新闻")
-            return
+            return {"total": 0, "success": 0, "failed": 0}
 
         print(f"📊 待LLM分析/重试: {len(rows)} 条")
-        
-        success_count = 0
-        fail_count = 0
-        
-        for i, row in enumerate(rows, 1):
-            print(f"\n[{i}/{len(rows)}] 处理: {row['title'][:40]}...")
-            
-            # 准备内容：优先使用content，如果没有则用summary
-            content = row.get("content") or row.get("summary") or ""
-            
-            result = None
-            for attempt in range(max_retry + 1):
-                try:
-                    result = analyze_news(row["title"], content)
-                    break
-                except Exception as e:
-                    print(f"  ⚠️ 第{attempt + 1}次调用失败: {e}")
-                    if attempt < max_retry:
-                        time.sleep(2)
-            
-            if result is None:
-                print(f"  ❌ 分析失败")
-                update_fields(conn, row["id"], {"status": "analyze_failed"})
-                fail_count += 1
-                continue
-            
-            # 更新数据库（使用正确的字段名）
-            success = update_fields(conn, row["id"], {
-                "summary": result.get("summary", ""),      # 使用 summary 而不是 llm_summary
-                "llm_category": result.get("category", ""),
-                "keywords": result.get("keywords", []),
-                "importance": result.get("importance", 1),
-                "status": "analyzed",
-            })
-            
-            if success:
+        success_count, fail_count = 0, 0
+
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = {
+                executor.submit(_analyze_one, row, max_retry): row
+                for row in rows
+            }
+            for i, future in enumerate(as_completed(futures), 1):
+                news_id, result = future.result()
+
+                if result is None:
+                    update_fields(conn, news_id, {"status": "analyze_failed"})
+                    fail_count += 1
+                    print(f"[{i}/{len(rows)}] id={news_id} ❌ 分析失败")
+                    continue
+
+                update_fields(conn, news_id, {
+                    "summary": result.get("summary", ""),
+                    "llm_category": result.get("category", ""),
+                    "keywords": result.get("keywords", []),
+                    "importance": result.get("importance", 1),
+                    "status": "analyzed",
+                })
                 success_count += 1
-                print(f"  ✅ 分析完成: {result.get('category', 'N/A')} | 重要性: {result.get('importance', 1)}")
-                print(f"  📝 摘要: {result.get('summary', '')[:50]}...")
-            else:
-                fail_count += 1
-                print(f"  ❌ 更新数据库失败")
-            
-            # 避免API限流
-            if i < len(rows):
-                time.sleep(sleep_sec)
-        
-        # # 统计结果
-        # print(f"\n📊 分析完成统计:")
-        # print(f"  ✅ 成功: {success_count}")
-        # print(f"  ❌ 失败: {fail_count}")
-        # print(f"  📝 总计: {len(rows)}")
-        return {"total": len(rows), "success": success_count, "failed": fail_count}  # ⭐ 新增
+                print(f"[{i}/{len(rows)}] id={news_id} ✅ {result.get('category','N/A')}")
+
+        return {"total": len(rows), "success": success_count, "failed": fail_count}
     finally:
         conn.close()
+#串行
+# def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
+#     """
+#     运行LLM结构化分析
+    
+#     Args:
+#         sleep_sec: 每次请求间隔秒数
+#         max_retry: 最大重试次数
+#         limit: 限制处理数量，None表示全部
+#     """
+#     conn = get_connection()
+    
+#     try:
+#         # 获取待分析的记录，包括之前分析失败但可重试的新闻 提取后extracted-》去重后deduped
+#         rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
+
+#         if not rows:
+#             print("✅ 没有待分析或可重试的新闻")
+#             return
+
+#         print(f"📊 待LLM分析/重试: {len(rows)} 条")
+        
+#         success_count = 0
+#         fail_count = 0
+        
+#         for i, row in enumerate(rows, 1):
+#             print(f"\n[{i}/{len(rows)}] 处理: {row['title'][:40]}...")
+            
+#             # 准备内容：优先使用content，如果没有则用summary
+#             content = row.get("content") or row.get("summary") or ""
+            
+#             result = None
+#             for attempt in range(max_retry + 1):
+#                 try:
+#                     result = analyze_news(row["title"], content)
+#                     break
+#                 except Exception as e:
+#                     print(f"  ⚠️ 第{attempt + 1}次调用失败: {e}")
+#                     if attempt < max_retry:
+#                         time.sleep(2)
+            
+#             if result is None:
+#                 print(f"  ❌ 分析失败")
+#                 update_fields(conn, row["id"], {"status": "analyze_failed"})
+#                 fail_count += 1
+#                 continue
+            
+#             # 更新数据库（使用正确的字段名）
+#             success = update_fields(conn, row["id"], {
+#                 "summary": result.get("summary", ""),      # 使用 summary 而不是 llm_summary
+#                 "llm_category": result.get("category", ""),
+#                 "keywords": result.get("keywords", []),
+#                 "importance": result.get("importance", 1),
+#                 "status": "analyzed",
+#             })
+            
+#             if success:
+#                 success_count += 1
+#                 print(f"  ✅ 分析完成: {result.get('category', 'N/A')} | 重要性: {result.get('importance', 1)}")
+#                 print(f"  📝 摘要: {result.get('summary', '')[:50]}...")
+#             else:
+#                 fail_count += 1
+#                 print(f"  ❌ 更新数据库失败")
+            
+#             # 避免API限流
+#             if i < len(rows):
+#                 time.sleep(sleep_sec)
+        
+#         # # 统计结果
+#         # print(f"\n📊 分析完成统计:")
+#         # print(f"  ✅ 成功: {success_count}")
+#         # print(f"  ❌ 失败: {fail_count}")
+#         # print(f"  📝 总计: {len(rows)}")
+#         return {"total": len(rows), "success": success_count, "failed": fail_count}  # ⭐ 新增
+#     finally:
+#         conn.close()
 
 
 def get_analysis_stats():

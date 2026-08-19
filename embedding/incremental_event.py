@@ -26,7 +26,7 @@ similarity < 0.75
 import sqlite3
 from pathlib import Path
 
-from vector_store import VectorStore
+from embedding.vector_store import VectorStore
 
 BasePath = Path(__file__).parent.parent
 DB_PATH = BasePath / "storage/news.db"

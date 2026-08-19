@@ -415,7 +415,7 @@ def create_daily_report(report_date=None):
 
 if __name__ == "__main__":
 
-    report = create_daily_report("2026-08-12")
+    report = create_daily_report()
 
     print(
         json.dumps(

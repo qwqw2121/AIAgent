@@ -3,6 +3,11 @@ daily_news_flow.py
 '''
 
 # pipeline/flows/daily_flow.py
+import sys
+import os
+# 添加项目根目录到 Python 路径
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+                                   
 from prefect import flow
 from datetime import date
 from pipeline.state import PipelineState
@@ -40,4 +45,4 @@ def daily_flow(run_date: date = None):
 
 
 if __name__ == "__main__":
-    daily_flow()
+    daily_flow("2026-08-19")

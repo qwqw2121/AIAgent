@@ -48,9 +48,9 @@ def dedup_exact(conn):
     """按 title_hash 精确去重,同hash只留id最小的一条"""
     rows = conn.execute("""
         SELECT id, title_hash FROM news
-        # WHERE extract_status IN ('ok_trafilatura', 'ok_readability')
         WHERE status IN ('extracted')
-          AND is_duplicate = 0
+        AND is_duplicate = 0
+          
     """).fetchall()
 
     groups = defaultdict(list)

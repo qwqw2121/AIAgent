@@ -1,6 +1,6 @@
 # pipeline/tasks/crawl_task.py
 from prefect import task, get_run_logger
-from ingestion.rss.rss_crawler import run as crawl_rss_sources
+from ingestion.rss_crawler import run as crawl_rss_sources
 from pipeline.state import PipelineState
 
 

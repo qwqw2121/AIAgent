@@ -1,9 +1,9 @@
 # pipeline/tasks/dedup_task.py
 from prefect import task, get_run_logger
-from ingestion.dedup.dedup import run as dedup_run
+from ingestion.dedup import run as dedup_run
 from pipeline.state import PipelineState
 import sqlite3
-from config import DB_PATH
+from config.database import DB_PATH
 
 @task(name="dedup-titles", retries=1)
 def dedup_task(state: PipelineState) -> PipelineState:
