@@ -1,9 +1,8 @@
 import sqlite3
 from pathlib import Path
 
-BASE_DIR = Path(__file__).resolve().parents[1]
-DB_PATH = BASE_DIR / "storage" / "news.db"
-
+BASE_DIR = Path(__file__).parent.parent
+DB_PATH = BASE_DIR / "storage/news.db"
 
 def get_connection() -> sqlite3.Connection:
     if not DB_PATH.exists():

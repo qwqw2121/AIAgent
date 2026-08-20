@@ -30,13 +30,26 @@ BASE_DIR = Path(__file__).parent.parent
 DB_PATH = BASE_DIR / "storage/news.db"
 
 load_dotenv()
-GLM_API_KEY = os.getenv("GLM_API_KEY")
-if not GLM_API_KEY:
-    raise ValueError("❌ GLM_API_KEY 未在 .env 中设置！")
+
+# ============================================================
+# LLM 配置
+# ============================================================
+
+API_KEY = os.getenv(
+    "LLM_API_KEY"
+)
+
+BASE_URL = os.getenv(
+    "LLM_BASE_URL"
+)
+
+MODEL_NAME = os.getenv(
+    "LLM_MODEL"
+)
 
 client = OpenAI(
-    api_key=GLM_API_KEY,
-    base_url="https://open.bigmodel.cn/api/paas/v4",
+    api_key=API_KEY,
+    base_url=BASE_URL,
 )
 
 MAX_CONTENT_CHARS = 3000
@@ -138,7 +151,9 @@ def analyze_news(title: str, content: str) -> dict:
             """
     
     response = client.chat.completions.create(
-        model="glm-4.7-flash",
+        model=MODEL_NAME,
+        # model="glm-5.2",
+        # model = "deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.3,
