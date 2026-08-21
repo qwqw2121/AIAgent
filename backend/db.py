@@ -1,9 +1,11 @@
 import sqlite3
 from pathlib import Path
 
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "storage/news.db"
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
+# BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"
 def get_connection() -> sqlite3.Connection:
     if not DB_PATH.exists():
         raise FileNotFoundError(f"SQLite 数据库不存在: {DB_PATH}")

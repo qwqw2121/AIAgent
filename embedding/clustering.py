@@ -34,12 +34,13 @@ from  embedding.vector_store import VectorStore
 # 配置
 # ============================================================
 
-DB_PATH = (
-    Path(__file__).parent.parent
-    / "storage"
-    / "news.db"
-)
-
+# DB_PATH = (
+#     Path(__file__).parent.parent
+#     / "storage"
+#     / "news.db"
+# )
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 vector_store = VectorStore()
 
 

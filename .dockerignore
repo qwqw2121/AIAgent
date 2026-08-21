@@ -1,0 +1,15 @@
+__pycache__
+*.pyc
+*.pyo
+.env
+.git
+.gitignore
+.vscode
+.idea
+*.md
+storage/  # 注意：数据库文件不打包进镜像，而是通过 volume 挂载
+node_modules
+.next
+venv
+.conda
+envs/

@@ -24,8 +24,11 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Semaphore
 
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "storage/news.db"  # ✅ 相对于文件位置，稳定
+# BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"  # ✅ 相对于文件位置，稳定
+
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 MIN_CONTENT_LEN = 80       # 正文短于这个长度,视为提取失败(反爬页/空页面常见现象)
 SLEEP_SEC = 1.0            # 每条之间的间隔,防止被目标网站封IP
@@ -126,11 +129,12 @@ def _extract_one(news_id, url):
         time.sleep(1.0 / RATE_LIMIT_PER_SEC)  # 简单的令牌桶节流
     return news_id, content, status
 
+#"SELECT id, url FROM news WHERE content IS NULL AND status = 'raw'"
 def run():
     conn = sqlite3.connect(DB_PATH)
     ensure_columns(conn)
     rows = conn.execute(
-        "SELECT id, url FROM news WHERE content IS NULL AND status = 'raw'"
+        "SELECT id, url FROM news WHERE content IS NULL AND status IN ('raw', 'extract_failed')"
     ).fetchall()
 
     ok, failed = 0, 0

@@ -1,1 +1,2 @@
 wsl中
+~/project/ai-news-agent$

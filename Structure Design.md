@@ -93,6 +93,32 @@ ai-news-agent/
 │   │
 │   ├── package.json
 │   └── ...
+├── pipeline/       
+│   │
+│   ├── flow
+│   │    ├── daily_news_flow.py
+│   ├── tasks
+│   │   │ 
+│   │   ├── crawl_task
+│   │   │
+│   │   ├── extract_task
+│   │   │
+│   │   ├── analyze_task
+│   │   │ 
+│   │   ├── embedding_task
+│   │   │
+│   │   ├── dedup_task
+│   │   │
+│   │   ├── clustering_task
+│   │   │
+│   │   └── report_task
+│   │
+│   │
+│   ├── deployments.py
+│   │
+│   │
+│   ├── states.py
+│   │
 │
 ├── .env
 ├── .env.example
@@ -100,18 +126,3 @@ ai-news-agent/
 ├── README.md
 └── requirements.txt
 
-daily_news_flow
-│
-├── crawl_task
-│
-├── extract_task
-│
-├── analyze_task
-│
-├── embedding_task
-│
-├── dedup_task
-│
-├── clustering_task
-│
-└── report_task

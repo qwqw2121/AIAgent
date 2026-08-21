@@ -1,5 +1,14 @@
+fastapi
+uvicorn[standard]
+prefect>=3,<4
+chromadb==0.5.23
+FlagEmbedding
+python-dotenv
+feedparser
 langchain
 langgraph
 langchain-community
-python-dotenv
-feedparser
+pydantic-settings
+httpx
+beautifulsoup4
+aiosqlite

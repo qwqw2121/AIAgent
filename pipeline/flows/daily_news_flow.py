@@ -24,9 +24,9 @@ from pipeline.tasks.report_task import report_task
 def daily_flow(run_date: date = None):
     state = PipelineState(run_date=run_date or date.today())
 
-    # state = crawl_task(state)
-    # state = extraction_task(state)
-    # state = dedup_task(state)
+    state = crawl_task(state)
+    state = extraction_task(state)
+    state = dedup_task(state)
     state = analysis_task(state)
     state = embedding_task(state)
     state = clustering_task(state)
@@ -45,5 +45,5 @@ def daily_flow(run_date: date = None):
 
 
 if __name__ == "__main__":
-    daily_flow("2026-08-19")
-    # daily_flow(run_date=date.today())
+    # daily_flow("2026-08-19")
+    daily_flow(run_date=date.today())

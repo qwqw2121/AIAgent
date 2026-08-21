@@ -1,15 +1,17 @@
 # embedding/event_store.py
 
+
 import sqlite3
 from pathlib import Path
 
 
-DB_PATH = (
-    Path(__file__).parent.parent
-    / "storage"
-    / "news.db"
-)
-
+# DB_PATH = (
+#     Path(__file__).parent.parent
+#     / "storage"
+#     / "news.db"
+# )
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 def init_event_tables():
 

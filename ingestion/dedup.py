@@ -25,7 +25,9 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path("storage/news.db")
+# DB_PATH = Path("storage/news.db")
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 TITLE_SIM_THRESHOLD = 0.85  # difflib相似度阈值,超过视为同一事件
 

@@ -37,13 +37,16 @@ os.environ['CUDA_VISIBLE_DEVICES'] = ''  # 禁用 GPU
 # 配置
 # =====================================================
 
-MODEL_PATH = "/mnt/d/AI_Models/bge-m3"
-DB_PATH = Path(__file__).parent.parent / "storage/news.db"
+# MODEL_PATH = "/mnt/d/AI_Models/bge-m3"
+# DB_PATH = Path(__file__).parent.parent / "storage/news.db"
+import os
+MODEL_PATH = os.getenv("BGE_MODEL_PATH", "/mnt/d/AI_Models/bge-m3")
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
-model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")  # 在 import 时就执行
-print(f"🔄 正在从本地加载 BGE-M3 模型...")
-print(f"   路径: {MODEL_PATH}")
-print(f"   设备: CPU (强制)")
+# model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")  # 在 import 时就执行
+# print(f"🔄 正在从本地加载 BGE-M3 模型...")
+# print(f"   路径: {MODEL_PATH}")
+# print(f"   设备: CPU (强制)")
 
 # =====================================================
 # 加载模型（使用 CPU）不管你要不要调用里面的函数，都会触发模型加载（BGE-M3 加载通常要几秒到几十秒）。

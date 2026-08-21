@@ -12,8 +12,10 @@ from pathlib import Path
 from datetime import datetime
 from datetime import datetime, timezone
 
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "storage/news.db"
+# BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"
+import os
+DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 TARGET_YEAR = 2026
 TARGET_MONTH = 8
@@ -76,7 +78,7 @@ def in_target_month(entry):
 
 
 def load_sources():
-    path = BASE_DIR / "sources/rss_sources.yaml"
+    path = os.getenv("SOURCES_PATH", Path(__file__).parent.parent /"sources/rss_sources.yaml")
     with open(path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 

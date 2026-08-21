@@ -1,1 +1,0 @@
-#结构化存储设计-SQLite存原文和metadata
