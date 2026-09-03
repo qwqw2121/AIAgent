@@ -3,7 +3,33 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export interface DailyReport {
   date: string;
   overview: string;
-  report: any;
+  report: DailyReportContent;
+}
+
+export interface ReportNews {
+  id: number;
+  title: string;
+  source?: string;
+  published?: string;
+  summary?: string;
+  content?: string;
+  llm_category?: string;
+  keywords?: string | string[];
+  importance?: number;
+  url?: string;
+}
+
+export interface ReportEvent {
+  title: string;
+  summary?: string;
+  why_it_matters?: string;
+  news_ids?: number[];
+  news?: ReportNews[];
+}
+
+export interface DailyReportContent {
+  overview: string;
+  events: ReportEvent[];
 }
 
 export async function getDailyReport(date: string): Promise<DailyReport> {

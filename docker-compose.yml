@@ -4,42 +4,30 @@ services:
     build:
       context: .
       dockerfile: docker/backend/Dockerfile
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
       - "8000:8000"
     volumes:
-      # 【核心】挂载本地代码到容器，实现热更新
-      - ./backend:/app/backend
-      - ./pipeline:/app/pipeline
-      - ./ingestion:/app/ingestion
-      - ./embedding:/app/embedding
-      - ./config:/app/config
-      # 挂载数据目录，保证 SQLite 和 Chroma 数据持久化
-      - ./storage:/app/storage 
-      - /mnt/d/AI_Models/bge-m3:/app/models/bge-m3:ro   # 只读挂载，模型不需要写
+      - ./storage:/app/storage
+      - ${BGE_MODEL_HOST_PATH:-/mnt/d/AI_Models/bge-m3}:/app/models/bge-m3:ro
     env_file:
       - .env
+    environment:
+      BGE_MODEL_PATH: /app/models/bge-m3
     networks:
       - ai-network
 
   # 2. 前端 (Next.js)
   frontend:
+    ports:
+      - "3000:3000"
     build:
       context: .
       dockerfile: docker/frontend/Dockerfile
-    # 开发模式下启动 dev server
-    command: npm run dev
-    ports:
-      - "3000:3000"
-    volumes:
-      # 挂载前端代码
-      - ./frontend:/app/frontend
-      # 排除 node_modules，防止本地和容器内系统架构冲突
-      - /app/frontend/node_modules 
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
-      # WSL 下 Next.js 热更新必须的配置
-      - WATCHPACK_POLLING=true 
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
       - backend
     networks:
@@ -63,17 +51,14 @@ services:
     build:
       context: .
       dockerfile: docker/backend/Dockerfile # 复用后端的镜像，因为需要相同的 Python 环境
-    command: prefect worker start --pool default-work-pool --name ai-news-worker
+    command: /bin/sh /app/docker/prefect/start-worker.sh
     volumes:
-      # 必须挂载 pipeline 代码，否则 Worker 找不到 Flow 和 Task
-      - ./pipeline:/app/pipeline
-      - ./ingestion:/app/ingestion
-      - ./embedding:/app/embedding
-      - ./config:/app/config
-      # 【核心】挂载 storage，确保 Worker 写入的 SQLite/Chroma 数据，后端能读到！
       - ./storage:/app/storage
+      - ${BGE_MODEL_HOST_PATH:-/mnt/d/AI_Models/bge-m3}:/app/models/bge-m3:ro
+      - ./docker/prefect/start-worker.sh:/app/docker/prefect/start-worker.sh:ro
     environment:
-      - PREFECT_API_URL=http://prefect-server:4200/api
+      PREFECT_API_URL: http://prefect-server:4200/api
+      BGE_MODEL_PATH: /app/models/bge-m3
     env_file:
       - .env
     depends_on:

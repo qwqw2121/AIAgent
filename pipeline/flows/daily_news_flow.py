@@ -9,7 +9,7 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
                                    
 from prefect import flow
-from datetime import date
+from datetime import date, timedelta
 from pipeline.state import PipelineState
 from pipeline.tasks.crawl_task import crawl_task
 from pipeline.tasks.extraction_task import extraction_task
@@ -22,7 +22,8 @@ from pipeline.tasks.report_task import report_task
 
 @flow(name="daily-news-pipeline", log_prints=True)
 def daily_flow(run_date: date = None):
-    state = PipelineState(run_date=run_date or date.today())
+    target_date = run_date or (date.today() - timedelta(days=1))
+    state = PipelineState(run_date=target_date)
 
     state = crawl_task(state)
     state = extraction_task(state)
@@ -45,5 +46,5 @@ def daily_flow(run_date: date = None):
 
 
 if __name__ == "__main__":
-    # daily_flow("2026-08-19")
-    daily_flow(run_date=date.today())
+    daily_flow(run_date=date.today() - timedelta(days=1))
+    # daily_flow(run_date=date(2026, 9, 1))

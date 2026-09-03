@@ -19,7 +19,10 @@ import chromadb
 # VECTOR_DB_PATH = BASE_DIR / "storage/vector_db"
 # DB_PATH = Path("storage/news.db") #绝对路径
 import os
-VECTOR_DB_PATH = os.getenv("VECTOR_DB_PATH", Path(__file__).parent.parent / "storage/vector_db")
+VECTOR_DB_PATH = Path(os.getenv(
+    "VECTOR_DB_PATH",
+    Path(__file__).parent.parent / "storage/vector_db",
+)).expanduser()
 class VectorStore:
     """
     Chroma 向量数据库封装
@@ -27,11 +30,15 @@ class VectorStore:
 
     def __init__(
         self,
-        persist_directory: str = str(VECTOR_DB_PATH),
+        persist_directory: str | Path = VECTOR_DB_PATH,
         collection_name: str = "ai_news",
     ):
+        persist_path = Path(persist_directory).expanduser()
+        if not persist_path.is_absolute():
+            persist_path = Path.cwd() / persist_path
+        persist_path.mkdir(parents=True, exist_ok=True)
         self.client = chromadb.PersistentClient(
-            path=persist_directory
+            path=str(persist_path)
         )
 
         self.collection = self.client.get_or_create_collection(

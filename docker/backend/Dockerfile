@@ -28,8 +28,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# ⚠️ 注意：这里故意不 COPY 业务代码 (backend/, pipeline/ 等)！
-# 业务代码将通过 docker-compose.yml 的 volumes 挂载到 /app 目录，实现热更新。
+COPY agent ./agent
+COPY backend ./backend
+COPY config ./config
+COPY embedding ./embedding
+COPY ingestion ./ingestion
+COPY pipeline ./pipeline
+COPY sources ./sources
 
 # 6. 暴露 FastAPI 端口
 EXPOSE 8000
