@@ -46,5 +46,5 @@ def daily_flow(run_date: date = None):
 
 
 if __name__ == "__main__":
-    daily_flow(run_date=date.today() - timedelta(days=3))
+    daily_flow(run_date=date.today() - timedelta(days=1))
     # daily_flow(run_date=date(2026, 9, 1))

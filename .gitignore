@@ -25,6 +25,8 @@ pkgs/
 .env.local
 .env.*.local
 
+2README.md
+
 # Local data / vector stores
 data/
 *.db

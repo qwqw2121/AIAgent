@@ -1,3 +1,5 @@
+
+
 # AI News Agent - FastAPI + Next.js integration
 
 This bundle connects the frontend to the existing `storage/news.db` through FastAPI.

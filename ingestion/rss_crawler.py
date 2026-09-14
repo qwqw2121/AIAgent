@@ -1,6 +1,7 @@
 # 在基础采集器基础上改造,加入:时间过滤、URL唯一去重、标题hash去重、HTML清洗:
 # 采集后的数据清洗后直接入库
-
+#采集能力(rss_crawler)现阶段不建议现在就包成 MCP tool——它是定时批处理,
+# 不是 agent 需要"随时调用"的能力,包了也用不上,先不做,属于"后续优化"。
 import feedparser  # 注意你原代码写的是 feedparserd,是笔误
 import yaml
 import json

@@ -13,7 +13,7 @@ from typing import List, Dict, Any, Sequence, Union
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Semaphore
 import time
-
+from storage.db import get_connection, fetch_by_status, update_fields
 MAX_WORKERS = 5                 # LLM API 通常有并发限制，建议比正文提取更保守
 RATE_LIMIT_PER_SEC = 3          # 需要参考你的 API 服务商速率限制文档
 _rate_limiter = Semaphore(RATE_LIMIT_PER_SEC)
@@ -54,43 +54,6 @@ client = OpenAI(
 
 MAX_CONTENT_CHARS = 3000
 
-
-def get_connection() -> sqlite3.Connection:
-    """获取数据库连接"""
-    DB_PATH.parent.mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def fetch_by_status(conn: sqlite3.Connection, status: Union[str, Sequence[str]], limit: int = None) -> List[Dict[str, Any]]:
-    """
-    获取指定状态的记录，默认排除 is_duplicate=1 的重复记录。
-    支持单个状态或多个状态（如 ('extracted', 'analyze_failed')）。
-    ("deduped", "analyze_failed")
-    """
-    cursor = conn.cursor()
-
-    statuses = [status] if isinstance(status, str) else list(status)
-    placeholders = ', '.join(['?'] * len(statuses))
-
-    query = f"""
-        SELECT id, url, title, content, summary, source, 
-               published, published_ts, crawl_time, status
-        FROM news 
-        WHERE status IN ({placeholders}) AND is_duplicate = 0
-        ORDER BY published_ts DESC
-    """
-
-    if limit:
-        query += f" LIMIT {limit}"
-
-    cursor.execute(query, tuple(statuses))
-
-    columns = [description[0] for description in cursor.description]
-    rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
-    return rows
 
 
 def update_fields(conn: sqlite3.Connection, news_id: int, fields: Dict[str, Any]) -> bool:
