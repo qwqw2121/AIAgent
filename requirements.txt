@@ -15,5 +15,5 @@ openai
 requests
 trafilatura
 readability-lxml
-transformers<5
-FlagEmbedding==1.4.2
+transformers==4.44.2
+FlagEmbedding==1.3.5

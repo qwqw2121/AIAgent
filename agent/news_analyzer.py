@@ -56,28 +56,28 @@ MAX_CONTENT_CHARS = 3000
 
 
 
-def update_fields(conn: sqlite3.Connection, news_id: int, fields: Dict[str, Any]) -> bool:
-    """
-    更新新闻记录的指定字段
-    """
-    if not fields:
-        return False
+# def update_fields(conn: sqlite3.Connection, news_id: int, fields: Dict[str, Any]) -> bool:
+#     """
+#     更新新闻记录的指定字段
+#     """
+#     if not fields:
+#         return False
     
-    # keywords如果是列表，转为JSON字符串
-    if 'keywords' in fields and isinstance(fields['keywords'], list):
-        fields['keywords'] = json.dumps(fields['keywords'], ensure_ascii=False)
+#     # keywords如果是列表，转为JSON字符串
+#     if 'keywords' in fields and isinstance(fields['keywords'], list):
+#         fields['keywords'] = json.dumps(fields['keywords'], ensure_ascii=False)
     
-    set_clause = ', '.join([f"{key} = ?" for key in fields.keys()])
-    values = list(fields.values())
-    values.append(news_id)
+#     set_clause = ', '.join([f"{key} = ?" for key in fields.keys()])
+#     values = list(fields.values())
+#     values.append(news_id)
     
-    try:
-        conn.execute(f"UPDATE news SET {set_clause} WHERE id = ?", values)
-        conn.commit()
-        return True
-    except Exception as e:
-        print(f"更新失败: {e}")
-        return False
+#     try:
+#         conn.execute(f"UPDATE news SET {set_clause} WHERE id = ?", values)
+#         conn.commit()
+#         return True
+#     except Exception as e:
+#         print(f"更新失败: {e}")
+#         return False
 
 
 def analyze_news(title: str, content: str) -> dict:

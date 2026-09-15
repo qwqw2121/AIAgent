@@ -1,71 +1,61 @@
 # storage/vectorstore.py
 import os
-from typing import List
+from pathlib import Path
+from dotenv import load_dotenv
 from langchain_chroma import Chroma
-from FlagEmbedding import BGEM3FlagModel
 
-MODEL_PATH = os.getenv("BGE_MODEL_PATH", "/mnt/d/AI_Models/bge-m3")
-PERSIST_DIR = "storage/vector_db"
+# 🌟 核心修改：引入 DashScope 原生 Embeddings
+from langchain_community.embeddings import DashScopeEmbeddings
 
-# BGE-M3 官方推荐的检索指令（query 侧）
-QUERY_INSTRUCTION = "为这个句子生成表示以用于检索相关文章："
+# 1. 加载 .env
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
+# 2. 配置读取
+EMBED_MODEL = str(os.getenv("LLM_EMBEDING", "text-embedding-v3")).strip()
+API_KEY = str(os.getenv("LLM_API_KEY", "")).strip()
 
-class BGE3Embeddings:
-    """把 BGEM3FlagModel 适配成 LangChain Embeddings 接口。"""
+if not API_KEY:
+    raise ValueError("❌ 请在 .env 中配置 LLM_API_KEY")
 
-    def __init__(self, model_path: str, device: str = "cpu", use_fp16: bool = False):
-        self.model = BGEM3FlagModel(model_path, use_fp16=use_fp16, device=device)
+print(f"✅ 成功读取 Embedding 配置: Model={EMBED_MODEL} (使用 DashScope 原生接口)")
 
-    def embed_documents(self, texts: List[str]) -> List[List[float]]:
-        out = self.model.encode(texts, batch_size=8, max_length=8192)
-        return out["dense_vecs"].tolist()
+# 🌟 3. 初始化 DashScope 原生 Embeddings (彻底告别 OpenAI 兼容模式的 Bug)
+embeddings = DashScopeEmbeddings(
+    model=EMBED_MODEL,
+    dashscope_api_key=API_KEY,  # 注意：这里的参数名是 dashscope_api_key
+)
 
-    # def embed_query(self, text: str) -> List[float]:
-    #     out = self.model.encode([QUERY_INSTRUCTION + text], max_length=8192)
-    #     return out["dense_vecs"][0].tolist()
-    # def embed_query(self, text: str) -> List[float]:
-    #     out = self.model.encode(
-    #         [QUERY_INSTRUCTION + text],
-    #         batch_size=1,
-    #         max_length=8192,
-    #     )
-    #     return out["dense_vecs"][0].tolist()
-    def embed_query(self, text: str) -> List[float]:
-        # 🌟 核心修复：防御性检查，确保 text 绝对是纯字符串
-        if isinstance(text, list):
-            # 如果是 LangChain 的消息列表 (如 [HumanMessage(...)])，提取最后一条的文本内容
-            if len(text) > 0 and hasattr(text[-1], 'content'):
-                text = str(text[-1].content)
-            else:
-                text = str(text)
-        elif not isinstance(text, str):
-            text = str(text)
-            
-        # 现在 text 已经是安全的纯字符串，可以安全拼接和 encode
-        out = self.model.encode(
-            [QUERY_INSTRUCTION + text],
-            batch_size=1,
-            max_length=8192,
-        )
-        return out["dense_vecs"][0].tolist()
-
-embeddings = BGE3Embeddings(MODEL_PATH, device="cpu", use_fp16=False)
-
+# 4. 初始化 Chroma
+PERSIST_DIR = os.getenv("VECTOR_DB_PATH", "storage/vector_db")
 vectorstore = Chroma(
     collection_name="news_embeddings",
     embedding_function=embeddings,
     persist_directory=PERSIST_DIR,
 )
 
-
+# ============================================================
+# 5. 业务接口 (保持不变)
+# ============================================================
 def upsert_news(news_id: int, title: str, summary: str, metadata: dict):
-    vectorstore.add_texts(
-        texts=[f"{title}\n{summary}"],
-        metadatas=[{**metadata, "news_id": news_id}],
-        ids=[str(news_id)],
-    )
-
+    """将新闻写入向量库 (带严格空值拦截)"""
+    safe_title = str(title).strip() if title is not None else "未知标题"
+    safe_summary = str(summary).strip() if summary is not None else ""
+    text_to_embed = f"{safe_title}\n{safe_summary}".strip()
+    
+    if not text_to_embed or text_to_embed.lower() in ["none", "none\nnone"]:
+        print(f"⚠️ 拦截: ID={news_id} 的文本内容为空，跳过向量入库")
+        return
+    
+    try:
+        vectorstore.add_texts(
+            texts=[text_to_embed],
+            metadatas=[{**metadata, "news_id": news_id}],
+            ids=[str(news_id)],
+        )
+    except Exception as e:
+        print(f"❌ ID={news_id} 向量入库失败: {e}")
+        raise
 
 def get_retriever(k=5):
     return vectorstore.as_retriever(search_kwargs={"k": k})

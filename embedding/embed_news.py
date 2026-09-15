@@ -1,85 +1,110 @@
-'''① 新闻 → Embedding
-从SQLite读取：
-extract_status = success
-analysis_status = success
-embedding_status = pending
-        ↓
-构造 embedding_text
-        ↓
-Embedding Model
-        ↓
-得到 vector
-        ↓
-'''
-
 # embedding/embed_news.py
-
-# diagnose.py
-# embedding/embed_news.py (完整修复版)
 
 import os
 import sqlite3
 import json
-import numpy as np
-from pathlib import Path
 import time
-
-from FlagEmbedding import BGEM3FlagModel
-from  embedding.vector_store import VectorStore
+from pathlib import Path
 
 # =====================================================
-# 强制使用 CPU（解决 CUDA 不兼容问题）
+# 1. 全局配置
 # =====================================================
-
-os.environ['CUDA_VISIBLE_DEVICES'] = ''  # 禁用 GPU
-
-# =====================================================
-# 配置
-# =====================================================
-
-# MODEL_PATH = "/mnt/d/AI_Models/bge-m3"
-# DB_PATH = Path(__file__).parent.parent / "storage/news.db"
-import os
-MODEL_PATH = os.getenv("BGE_MODEL_PATH", "/mnt/d/AI_Models/bge-m3")
 DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
-# model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")  # 在 import 时就执行
-# print(f"🔄 正在从本地加载 BGE-M3 模型...")
-# print(f"   路径: {MODEL_PATH}")
-# print(f"   设备: CPU (强制)")
+# 🌟 核心开关：'online' (在线API) 或 'local' (本地BGE-M3)
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "online").lower() 
+
+# 在线模型配置
+EMBED_MODEL = os.getenv("LLM_EMBEDING", "text-embedding-v3")
+
+# 本地模型配置
+BGE_MODEL_PATH = os.getenv("BGE_MODEL_PATH", "/mnt/d/AI_Models/bge-m3")
+
+print(f"🚀 Embedding 模式: {EMBEDDING_PROVIDER.upper()}")
 
 # =====================================================
-# 加载模型（使用 CPU）不管你要不要调用里面的函数，都会触发模型加载（BGE-M3 加载通常要几秒到几十秒）。
-# 这在 Prefect flow 运行时问题不大（反正这个环节本来就要用模型），
-# 但会拖慢任何"只是想调用别的函数做测试/调试"的场景，
-# 也会导致单元测试这个模块变得很重。建议改成“懒加载单例”：
+# 2. 引擎 1：本地 BGE-M3 (懒加载)
 # =====================================================
+_local_model = None
 
-_model = None
+def get_local_model():
+    global _local_model
+    if _local_model is None and EMBEDDING_PROVIDER == 'local':
+        os.environ['CUDA_VISIBLE_DEVICES'] = ''  # 强制 CPU
+        print(f"🔄 正在加载本地 BGE-M3 模型: {BGE_MODEL_PATH} (CPU)")
+        from FlagEmbedding import BGEM3FlagModel
+        _local_model = BGEM3FlagModel(BGE_MODEL_PATH, use_fp16=False, device="cpu")
+    return _local_model
 
-def get_model():
-    global _model
-    if _model is None:
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''
-        print("🔄 正在加载 BGE-M3 模型...")
-        _model = BGEM3FlagModel(MODEL_PATH, use_fp16=False, device="cpu")
-    return _model
 # =====================================================
-# 初始化向量存储
+# 3. 引擎 2：在线 API (懒加载)
 # =====================================================
+_online_client = None
 
+def get_online_client():
+    global _online_client
+    if _online_client is None and EMBEDDING_PROVIDER == 'online':
+        from openai import OpenAI
+        API_KEY = os.getenv("LLM_API_KEY")
+        BASE_URL = os.getenv("LLM_BASE_URL")
+        if not API_KEY or not BASE_URL:
+            raise ValueError("❌ 使用在线 Embedding 需要在 .env 中配置 LLM_API_KEY 和 LLM_BASE_URL")
+        _online_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+    return _online_client
+
+# =====================================================
+# 4. 统一 Embedding 接口 (自动路由)
+# =====================================================
+def get_embedding(text: str):
+    """
+    根据 EMBEDDING_PROVIDER 自动选择本地或在线模型生成向量
+    返回: List[float] 或 None
+    """
+    if not text or len(text.strip()) < 5:
+        return None
+    
+    try:
+        if EMBEDDING_PROVIDER == 'online':
+            # 🌟 在线 API 调用
+            client = get_online_client()
+            response = client.embeddings.create(
+                model=EMBED_MODEL,
+                input=text
+            )
+            return response.data[0].embedding
+            
+        else:
+            # 🌟 本地 BGE-M3 调用
+            model = get_local_model()
+            if model is None:
+                raise RuntimeError("本地模型未初始化，请检查 EMBEDDING_PROVIDER 配置")
+            
+            result = model.encode(text)
+            embedding = result['dense_vecs']
+            
+            # 兼容 numpy array 和 list
+            if hasattr(embedding, 'tolist'):
+                embedding = embedding.tolist()
+            return list(embedding)
+            
+    except Exception as e:
+        print(f"❌ Embedding 生成失败 ({EMBEDDING_PROVIDER}): {e}")
+        return None
+
+# =====================================================
+# 5. 辅助函数 (保持不变)
+# =====================================================
+from embedding.vector_store import VectorStore
 vector_store = VectorStore()
 
-
-# =====================================================
-# 构造 Embedding 文本
-# =====================================================
+# embedding/embed_news.py (只需修改 build_embedding_text 函数)
 
 def build_embedding_text(row):
-    """使用LLM分析结果构造Embedding文本"""
-    title = row["title"] or ""
-    summary = row["summary"] or ""
-    category = row["llm_category"] or ""
+    """使用LLM分析结果构造Embedding文本 (严格防御版)"""
+    # 🌟 强制转字符串，杜绝 None
+    title = str(row["title"]).strip() if row["title"] else "未知标题"
+    summary = str(row["summary"]).strip() if row["summary"] else "无摘要"
+    category = str(row["llm_category"]).strip() if row["llm_category"] else "未分类"
 
     keywords = row["keywords"] or []
     if isinstance(keywords, str):
@@ -90,66 +115,25 @@ def build_embedding_text(row):
 
     keywords_text = ", ".join(str(k) for k in keywords) if isinstance(keywords, list) else str(keywords)
 
-    return f"""标题：{title}
+    text = f"""标题：{title}
 摘要：{summary}
 分类：{category}
 关键词：{keywords_text}""".strip()
-
-
-# =====================================================
-# 调用 BGE-M3 Embedding（修复版）
-# =====================================================
-
-def get_embedding(text: str):
-    """
-    使用 BGE-M3 生成向量
     
-    注意：BGE-M3 返回字典，需要取 'dense_vecs' 键的值
-    """
-    if not text or len(text.strip()) < 5:
-        return None
-    
-    try:
-        # ✅ BGE-M3 返回字典
-        result = get_model().encode(text)
-        
-        # ✅ 调试：查看返回类型
-        print(f"🔍 result 类型: {type(result)}")
-        print(f"🔍 result 键: {result.keys() if hasattr(result, 'keys') else '不是字典'}")
-        
-        # ✅ 取稠密向量
-        embedding = result['dense_vecs']
-        
-        # ✅ 如果是 numpy array，转为 list
-        if hasattr(embedding, 'tolist'):
-            embedding = embedding.tolist()
-        
-        # ✅ 确保是 list
-        if not isinstance(embedding, list):
-            embedding = list(embedding)
-        
-        return embedding
-        
-    except Exception as e:
-        print(f"❌ Embedding 生成失败: {e}")
-        return None
-
-
-# =====================================================
-# 查询待向量化新闻
-# =====================================================
-
+    # 🚨 确保绝不返回空字符串
+    return text if text else "无有效内容"
 def load_news():
     """从 SQLite 读取待向量化的新闻"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
 
+    # 注意：这里假设你的状态是 'analyzed'，如果是 'embed_failed' 请自行修改
     cursor.execute("""
         SELECT id, title, summary, llm_category, keywords, 
                source, category, published
         FROM news 
-        WHERE status = 'analyzed'
+        WHERE status = 'analyzed' OR status = 'embed_failed'
         ORDER BY id
     """)
 
@@ -157,94 +141,62 @@ def load_news():
     conn.close()
     return rows
 
-
-# =====================================================
-# 更新状态
-# =====================================================
-
 def update_status(news_id, status):
     """更新新闻状态"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-
-    cursor.execute("""
-        UPDATE news
-        SET status = ?
-        WHERE id = ?
-    """, (status, news_id))
-
+    cursor.execute("UPDATE news SET status = ? WHERE id = ?", (status, news_id))
     conn.commit()
     conn.close()
 
-
 # =====================================================
-# 测试函数
+# 6. 测试与主流程
 # =====================================================
-
 def test_embedding():
     """测试 Embedding 是否正常工作"""
     test_text = "测试文本：这是一条关于AI的新闻"
-    print(f"\n🧪 测试 Embedding...")
-    print(f"   输入: {test_text}")
+    print(f"\n🧪 测试 Embedding ({EMBEDDING_PROVIDER})...")
     
+    start_time = time.time()
     embedding = get_embedding(test_text)
+    cost_time = time.time() - start_time
     
     if embedding:
-        print(f"   ✅ 成功生成向量")
-        print(f"   向量类型: {type(embedding)}")
-        print(f"   向量长度: {len(embedding)}")
-        print(f"   前5个值: {embedding[:5]}")
+        print(f"   ✅ 成功生成向量 (耗时: {cost_time:.2f}s)")
+        print(f"   向量维度: {len(embedding)}")
         return True
     else:
         print(f"   ❌ 测试失败")
         return False
 
-
-# =====================================================
-# 主流程
-# =====================================================
-
 def run():
     """主流程：生成所有新闻的向量"""
-    
-    # 测试 Embedding
     if not test_embedding():
-        print("❌ Embedding 测试失败，请检查模型加载")
+        print("❌ Embedding 测试失败，请检查配置")
         return
     
-    # 加载新闻
     news_list = load_news()
     print(f"\n📊 待向量化新闻：{len(news_list)} 条")
     
     success_count = 0
     fail_count = 0
-    skip_count = 0
     
     for i, row in enumerate(news_list, 1):
         news_id = row["id"]
-        
         print(f"\n[{i}/{len(news_list)}] 处理 ID={news_id}")
         
         try:
             # 1. 构造文本
             embedding_text = build_embedding_text(row)
-            
             if not embedding_text.strip():
                 print(f"  ⚠️ 跳过: 没有可 Embedding 的内容")
-                skip_count += 1
                 continue
-            
-            print(f"  📝 文本长度: {len(embedding_text)} 字符")
             
             # 2. 生成向量
             embedding = get_embedding(embedding_text)
-            
             if embedding is None:
-                print(f"  ❌ 生成向量失败")
                 fail_count += 1
                 continue
-            
-            print(f"  ✅ 向量生成成功，维度: {len(embedding)}")
             
             # 3. 存入向量数据库
             vector_store.add_news(
@@ -256,7 +208,7 @@ def run():
                     "title": row["title"] or "",
                     "source": row["source"] or "",
                     "category": row["category"] or "",
-                    "published_at": row["published"]  or "",
+                    "published_at": row["published"] or "",
                 }
             )
             
@@ -270,19 +222,16 @@ def run():
             print(f"  ❌ 失败: {e}")
             import traceback
             traceback.print_exc()
-        
-        # 避免请求过快
-        time.sleep(0.5)
+            
+        # 🌟 优化：在线 API 不需要 sleep，本地模型 CPU 跑本身就有延迟
+        # 如果担心在线 API 限流，可以取消注释下面这行
+        # time.sleep(0.1) 
     
-    # 统计结果
-    # print(f"\n{'='*60}")
-    # print(f"📊 Embedding 任务完成")
-    # print(f"  ✅ 成功: {success_count} 条")
-    # print(f"  ❌ 失败: {fail_count} 条")
-    # print(f"  ⏭️ 跳过: {skip_count} 条")
-    # print(f"  📝 总计: {len(news_list)} 条")
-    return {"total": len(news_list), "success": success_count, "failed": fail_count, "skipped": skip_count}
-
+    print(f"\n{'='*60}")
+    print(f"📊 Embedding 任务完成")
+    print(f"  ✅ 成功: {success_count} 条")
+    print(f"  ❌ 失败: {fail_count} 条")
+    return {"total": len(news_list), "success": success_count, "failed": fail_count}
 
 if __name__ == "__main__":
     run()

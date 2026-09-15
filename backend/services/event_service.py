@@ -1,4 +1,4 @@
-from backend.db import get_connection, table_exists
+from storage.db import get_connection, table_exists
 
 
 def list_events():
