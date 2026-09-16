@@ -40,7 +40,7 @@ BASE_URL = os.getenv(
 )
 
 MODEL_NAME = os.getenv(
-    "LLM_MODEL"
+    "LLM_ANALYSE"
 )
 
 client = OpenAI(

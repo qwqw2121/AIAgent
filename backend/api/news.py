@@ -10,7 +10,7 @@ def api_list_news(
     category: str | None = None,
     source: str | None = None,
     q: str | None = None,
-    importance: int | None = Query(None, ge=1, le=5),
+    importance: int | None = Query(None, ge=1, le=10),
 ):
     return list_news(limit, offset, category, source, q, importance)
 

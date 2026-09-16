@@ -1,4 +1,7 @@
 # agent/graph.py
+
+
+
 import sys
 import os
 import json
@@ -17,7 +20,10 @@ from langgraph.graph import StateGraph, END
 from typing import TypedDict, Literal, Optional
 from langchain_openai import ChatOpenAI
 from langchain_mcp_adapters.client import MultiServerMCPClient
+from storage.db import fetch_report_by_date, get_connection
 
+# 后台生成任务集合，防止被 GC 回收
+BACKGROUND_TASKS: set[asyncio.Task] = set()
 
 # ============================================================
 # 1. LLM 配置
@@ -93,12 +99,40 @@ async def astream_invoke(llm, prompt: str) -> str:
     return full_content
 
 
+def load_local_daily_report(report_date: str) -> dict | None:
+    """Read the report from the same database used by the API."""
+    conn = get_connection()
+    try:
+        row = fetch_report_by_date(conn, report_date)
+        if not row:
+            return None
+        report = json.loads(row["report_json"])
+        return report if isinstance(report, dict) else None
+    except (TypeError, json.JSONDecodeError):
+        return None
+    finally:
+        conn.close()
+
+
+def format_daily_report(report_date: str, report: dict) -> str:
+    overview = report.get("overview") or "暂无日报概览。"
+    events = report.get("events") or []
+    lines = [f"以下是 {report_date} 的新闻简报：", "", overview, "", "重点事件："]
+    for index, event in enumerate(events, 1):
+        if not isinstance(event, dict):
+            continue
+        title = event.get("title") or "未命名事件"
+        detail = event.get("summary") or event.get("why_it_matters") or "暂无补充说明。"
+        lines.append(f"{index}. {title}\n   {detail}")
+    return "\n".join(lines)
+
+
 # ============================================================
 # 3. 共享状态定义
 # ============================================================
 class AgentState(TypedDict):
     question: str
-    route: Optional[Literal["knowledge", "summarizer"]]
+    route: Optional[Literal["knowledge", "summarizer", "generator"]]
     docs: list
     sources: list
     report_date: Optional[str]
@@ -108,7 +142,22 @@ class AgentState(TypedDict):
 # 全局 TOOL_MAP，将在 init_agent 中动态赋值
 TOOL_MAP = {}
 
+# 后台生成任务集合，防止被 GC 回收
+BACKGROUND_TASKS: set[asyncio.Task] = set()
 
+# 后台任务直接调 flow，不经过 MCP
+async def _trigger_report_generation(report_date: str):
+    def _run():
+        from datetime import datetime
+        from pipeline.flows.daily_news_flow import daily_flow
+        target = datetime.strptime(report_date, "%Y-%m-%d").date()
+        daily_flow(run_date=target)   # 和你 __main__ 里的调用方式一致
+
+    try:
+        await asyncio.to_thread(_run)   # 或者保持 create_task 包裹
+        print(f"✅ 日报生成完成: {report_date}")
+    except Exception as e:
+        print(f"❌ 日报生成失败: {type(e).__name__}: {e}")
 # ============================================================
 # 4. Supervisor（路由分类 + 日期解析）
 # ============================================================
@@ -130,6 +179,7 @@ async def supervisor(state: AgentState):
 - 如果用户提到"昨天"，report_date 必须是 {yesterday}
 - 如果用户提到其他具体日期，解析成 YYYY-MM-DD
 - 如果用户没提到任何日期，report_date 必须是 null
+- 如果用户明确要求"生成/跑/构建"某天日报（例如"帮我生成昨天的日报"），route="generator"
 
 用户问题：{state['question']}
 """
@@ -248,41 +298,73 @@ async def summarizer(state: AgentState):
         return {
             "answer": (
                 f"抱歉，生成简报需要指定具体日期。"
-                f"例如：'帮我总结一下 {today} 的新闻'。"
+                f"例如：'帮我总结一下 {today} 的新闻'，"
+                f"或说 '帮我生成 {today} 的日报'。"
             ),
+            "sources": [],
+        }
+
+    local_report = await asyncio.to_thread(load_local_daily_report, report_date)
+    if local_report:
+        return {
+            "answer": format_daily_report(report_date, local_report),
             "sources": [],
         }
 
     if "get_daily_report" not in TOOL_MAP:
         return {"answer": "系统暂不支持日报查询功能。", "sources": []}
 
-    report_tool = TOOL_MAP["get_daily_report"]
-    try:
-        result = await report_tool.ainvoke({"report_date": report_date})
+    result = await TOOL_MAP["get_daily_report"].ainvoke({"report_date": report_date})
+    report_data = parse_mcp_result(result)
 
-        # 🌟 调试：看原始返回
-        print(f"🔍 get_daily_report raw: {result!r}")
-
-        report_data = parse_mcp_result(result)
-
-        print(f"🔍 get_daily_report parsed: {report_data!r}")
-
-        if isinstance(report_data, dict) and report_data.get("content"):
-            return {
-                "answer": f"以下是 {report_date} 的新闻简报：\n\n{report_data['content']}",
-                "sources": [],
-            }
-        else:
-            return {
-                "answer": f"抱歉，数据库中尚未生成 {report_date} 的日报。请稍后再试或联系管理员生成。",
-                "sources": [],
-            }
-    except Exception as e:
-        print(f"❌ 查询简报失败: {e}")
+    # ✅ 情况一：有日报，直接输出
+    if isinstance(report_data, dict) and report_data.get("content"):
+        content = report_data["content"]
+        if isinstance(content, str):
+            try:
+                content = json.loads(content)
+            except json.JSONDecodeError:
+                pass
+        if isinstance(content, dict):
+            content = format_daily_report(report_date, content)
         return {
-            "answer": f"抱歉，查询 {report_date} 的日报时发生系统错误。",
+            "answer": content if isinstance(content, str) else str(content),
             "sources": [],
         }
+
+    # 🌟 情况二：无日报 → 后台触发 pipeline，立即回复用户
+    task = asyncio.create_task(_trigger_report_generation(report_date))
+    BACKGROUND_TASKS.add(task)
+    task.add_done_callback(BACKGROUND_TASKS.discard)
+
+    return {
+        "answer": (
+            f"数据库中暂无 {report_date} 的日报。📋 已为您启动后台生成任务"
+            f"（包括新闻抓取、去重、分析、向量化与汇总，预计需要几分钟）。\n\n"
+            f"请稍后重新发送「帮我总结 {report_date} 的新闻」即可获取。"
+        ),
+        "sources": [],
+    }
+
+
+# ============================================================
+# 增加节点
+# ============================================================
+async def report_generator(state: AgentState):
+    """用户主动要求生成指定日期的日报"""
+    report_date = state.get("report_date") or date.today().isoformat()
+
+    task = asyncio.create_task(_trigger_report_generation(report_date))
+    BACKGROUND_TASKS.add(task)
+    task.add_done_callback(BACKGROUND_TASKS.discard)
+
+    return {
+        "answer": (
+            f"已开始为 {report_date} 生成日报 🚀（流程：抓取 → 去重 → 分析 → 向量化 → 汇总，"
+            f"预计需要几分钟）。完成后您可以直接问我「{report_date} 的新闻简报」。"
+        ),
+        "sources": [],
+    }
 
 
 # ============================================================
@@ -294,16 +376,18 @@ def build_graph():
     graph.add_node("kb_retrieve", kb_retrieve)
     graph.add_node("kb_generate", kb_generate)
     graph.add_node("summarizer", summarizer)
+    graph.add_node("generator", report_generator)
 
     graph.set_entry_point("supervisor")
     graph.add_conditional_edges(
         "supervisor",
         route_decision,
-        {"knowledge": "kb_retrieve", "summarizer": "summarizer"},
+        {"knowledge": "kb_retrieve", "summarizer": "summarizer","generator": "generator"},
     )
     graph.add_edge("kb_retrieve", "kb_generate")
     graph.add_edge("kb_generate", END)
     graph.add_edge("summarizer", END)
+    graph.add_edge("generator",END)
 
     return graph.compile()
 
@@ -361,20 +445,23 @@ async def main():
 
     app = build_graph()
 
-    # 测试 Knowledge 路由
-    print("=== 测试 Knowledge 路由 ===")
-    r1 = await app.ainvoke({"question": "最近有哪些大模型发布的新闻？"})
-    print("回答:", r1["answer"])
-    print("来源:", r1.get("sources"))
+    # # 测试 Knowledge 路由
+    # print("=== 测试 Knowledge 路由 ===")
+    # r1 = await app.ainvoke({"question": "最近有哪些大模型发布的新闻？"})
+    # print("回答:", r1["answer"])
+    # print("来源:", r1.get("sources"))
 
-    print("\n" + "=" * 50 + "\n")
+    # print("\n" + "=" * 50 + "\n")
 
-    # 测试 Summarizer 路由
-    print("=== 测试 Summarizer 路由 ===")
-    r2 = await app.ainvoke({"question": "帮我总结一下昨天的重要新闻"})
-    print("回答:", r2["answer"])
-    print("来源:", r2.get("sources"))
+    # # 测试 Summarizer 路由
+    # print("=== 测试 Summarizer 路由 ===")
+    # r2 = await app.ainvoke({"question": "帮我总结一下昨天的重要新闻"})
+    # print("回答:", r2["answer"])
+    # print("来源:", r2.get("sources"))
 
+    # 测试 Generator 路由
+    r = await app.ainvoke({"question": "帮我生成 2026-09-01 的日报"})
+    print(r["answer"]) 
 
 if __name__ == "__main__":
     asyncio.run(main())
