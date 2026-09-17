@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getDailyReport, DailyReport, DailyReportContent, ReportNews } from '@/services/api';
+import Header from '@/app/components/Header';
 
 function formatPublished(value?: string) {
   if (!value) return '';
@@ -74,76 +75,11 @@ export default function ReportPage() {
 
   if (!report) return null;
 
-  return (
-    <main className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
-        <div className="mb-6">
-          <Link href="/" className="text-blue-500 hover:underline">
-            ← 返回首页
-          </Link>
-        </div>
-
-        <div className="bg-white rounded-lg shadow-md p-8">
-          <h1 className="text-3xl font-bold mb-2">📰 AI 新闻日报</h1>
-          <p className="text-gray-500 mb-6">{report.date}</p>
-
-          <div className="bg-gray-50 rounded-lg p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-3">📊 概览</h2>
-            <p className="text-gray-700">{report.overview}</p>
-          </div>
-
-          <div>
-            <h2 className="text-xl font-semibold mb-4">📋 今日要闻</h2>
-            <div className="space-y-6">
-              {(report.report as DailyReportContent).events?.map((event, index) => (
-                <article key={`${event.title}-${index}`} className="border border-gray-200 rounded-lg p-5">
-                  <h3 className="text-lg font-semibold">{index + 1}. {event.title}</h3>
-                  {event.summary && <p className="text-gray-700 mt-3 leading-7">{event.summary}</p>}
-                  {event.why_it_matters && (
-                    <p className="mt-3 border-l-4 border-blue-400 pl-3 text-gray-600 leading-7">
-                      <strong>关注理由：</strong>{event.why_it_matters}
-                    </p>
-                  )}
-
-                  <div className="mt-5 space-y-4">
-                    {event.news?.map((news) => (
-                      <div key={news.id} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                          <span>{news.source || '未知来源'}</span>
-                          {news.published && <span>· {formatPublished(news.published)}</span>}
-                          {news.importance !== undefined && <span>· 重要性 {news.importance}/10</span>}
-                        </div>
-                        <h4 className="font-medium text-gray-900 mt-2">{news.title}</h4>
-                        {news.summary && <p className="text-gray-700 mt-2 leading-7">{news.summary}</p>}
-                        {keywordsOf(news).length > 0 && (
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {keywordsOf(news).map((keyword) => (
-                              <span key={keyword} className="text-xs bg-white border border-gray-200 rounded px-2 py-1 text-gray-600">
-                                {keyword}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        {news.content && (
-                          <details className="mt-4">
-                            <summary className="cursor-pointer text-sm text-blue-600">查看正文</summary>
-                            <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700 leading-7">{news.content}</p>
-                          </details>
-                        )}
-                        {news.url && (
-                          <a href={news.url} target="_blank" rel="noreferrer" className="inline-block mt-3 text-sm text-blue-600 hover:underline">
-                            打开原文 ↗
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </article>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </main>
-  );
+  return <main className="app-shell report-page"><Header /><div className="content-wrap report-reader">
+    <Link href="/" className="back-link">← 返回首页</Link>
+    <header className="report-header"><p className="eyebrow">DAILY BRIEF</p><h1>AI 新闻日报</h1><p className="report-date-large">{report.date}</p></header>
+    <section className="report-lede"><span>编辑摘要</span><p>{report.overview}</p></section>
+    <div className="report-section-heading"><h2>今日要闻</h2><span>{report.report.events.length} 个事件</span></div>
+    <div className="report-events">{(report.report as DailyReportContent).events?.map((event, index) => <article key={`${event.title}-${index}`} className="report-event-card"><div className="report-event-index">{String(index + 1).padStart(2, '0')}</div><div className="report-event-main"><h3>{event.title}</h3>{event.summary && <p className="report-event-summary">{event.summary}</p>}{event.why_it_matters && <p className="report-why"><strong>为什么重要</strong>{event.why_it_matters}</p>}<div className="report-news-list">{event.news?.map((news) => <div key={news.id} className="report-news-item"><div className="report-news-meta"><span>{news.source || '未知来源'}</span>{news.published && <span>{formatPublished(news.published)}</span>}{news.importance !== undefined && <span>重要性 {news.importance}/10</span>}</div><h4>{news.title}</h4>{news.summary && <p>{news.summary}</p>}{keywordsOf(news).length > 0 && <div className="keyword-list">{keywordsOf(news).map((keyword) => <span key={keyword}>{keyword}</span>)}</div>}{news.content && <details><summary>查看正文</summary><p>{news.content}</p></details>}{news.url && <a href={news.url} target="_blank" rel="noreferrer">打开原文 ↗</a>}</div>)}</div></div></article>)}</div>
+  </div></main>;
 }

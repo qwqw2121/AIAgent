@@ -1,16 +1,39 @@
 'use client';
 
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { askAgent } from '@/services/api';
+import { streamAgent } from '@/services/api';
 
 type Message = { role: 'user' | 'assistant'; content: string };
+const MESSAGE_STORAGE_KEY = 'ai-news-assistant-messages';
+const SESSION_STORAGE_KEY = 'ai-news-assistant-session';
+
+function storedMessages(): Message[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const value = JSON.parse(localStorage.getItem(MESSAGE_STORAGE_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function storedSessionId() {
+  if (typeof window === 'undefined') return `chat-${Date.now()}`;
+  const existing = localStorage.getItem(SESSION_STORAGE_KEY);
+  if (existing) return existing;
+  const created = `chat-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  localStorage.setItem(SESSION_STORAGE_KEY, created);
+  return created;
+}
 
 export default function Assistant() {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState('');
   const [asking, setAsking] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hydrated, setHydrated] = useState(false);
   const [downloadableReport, setDownloadableReport] = useState<string | null>(null);
+  const sessionId = useRef(storedSessionId());
   const panelRef = useRef<HTMLElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -23,6 +46,16 @@ export default function Assistant() {
     return () => document.removeEventListener('mousedown', closeOnOutsideClick);
   }, [open]);
 
+  useEffect(() => {
+    setMessages(storedMessages());
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(MESSAGE_STORAGE_KEY, JSON.stringify(messages));
+  }, [messages, hydrated]);
+
   const submitQuestion = async (event: FormEvent) => {
     event.preventDefault();
     const text = question.trim();
@@ -31,12 +64,24 @@ export default function Assistant() {
     setMessages((current) => [...current, { role: 'user', content: text }]);
     setAsking(true);
     try {
-      const result = await askAgent(text);
-      setMessages((current) => [...current, { role: 'assistant', content: result.answer }]);
-      const hasConcreteDate = /(20\d{2}[年/-]\d{1,2}[月/-]\d{1,2}日?|\d{1,2}月\d{1,2}日|今天|昨日|昨天)/.test(text);
-      const askedForReport = /日报|每日报告/.test(text) && hasConcreteDate;
-      const answerIsReport = /日报|今日要闻|日报概览/.test(result.answer) && result.answer.length > 120;
-      setDownloadableReport(askedForReport || answerIsReport ? result.answer : null);
+      setMessages((current) => [...current, { role: 'assistant', content: '' }]);
+      let answer = '';
+      let completed = false;
+      await streamAgent(text, sessionId.current, (streamEvent) => {
+        if (streamEvent.type === 'token') {
+          answer += streamEvent.content || '';
+          setMessages((current) => current.map((message, index) => index === current.length - 1 ? { ...message, content: answer } : message));
+        } else if (streamEvent.type === 'tool') {
+          setMessages((current) => current.map((message, index) => index === current.length - 1 ? { ...message, content: `${answer}${answer ? '\n\n' : ''}正在${streamEvent.name || '检索新闻库'}…` } : message));
+        } else if (streamEvent.type === 'error') {
+          throw new Error(streamEvent.content || '请求失败，请稍后再试');
+        }
+        completed = true;
+      });
+      if (completed) {
+        setMessages((current) => current.map((message, index) => index === current.length - 1 ? { ...message, content: answer } : message));
+        setDownloadableReport(/日报|今日要闻|日报概览/.test(answer) && answer.length > 120 ? answer : null);
+      }
     } catch (error) {
       setMessages((current) => [...current, { role: 'assistant', content: error instanceof Error ? error.message : '请求失败，请稍后再试' }]);
     } finally {
