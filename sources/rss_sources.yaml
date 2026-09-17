@@ -3,7 +3,7 @@ sources:
 
   - name: OpenAI Blog
     type: rss
-    url: https://openai.com/blog/rss.xml
+    url: https://openai.com/news/rss.xml 
     language: en
     category:
       - Research
@@ -19,7 +19,7 @@ sources:
 
   - name: arXiv AI
     type: rss
-    url: https://export.arxiv.org/rss/cs.AI
+    url: https://rss.arxiv.org/rss/cs.AI  
     language: en
     category:
       - Research
@@ -56,13 +56,6 @@ sources:
       - Industry
       - Media
 
-  - name: 36氪
-    type: rss
-    url: https://36kr.com/feed
-    language: zh
-    category:
-      - Industry
-      - Tech
 
   - name: 雷锋网
     type: rss
@@ -72,13 +65,6 @@ sources:
       - Industry
       - Media
 
-  - name: 虎嗅
-    type: rss
-    url: https://www.huxiu.com/rss/0.xml
-    language: zh
-    category:
-      - Industry
-      - Media
 
   - name: 极客公园
     type: rss
@@ -95,3 +81,135 @@ sources:
     category:
       - Community
       - Tech
+ # ---------- 新增：海外 AI / 大模型核心信源 ----------
+  - name: Google DeepMind Blog                              # 新增
+    type: rss
+    url: https://deepmind.google/blog/feed/basic/
+    language: en
+    category:
+      - Research
+      - Industry
+
+  - name: Google Research Blog                              # 新增
+    type: rss
+    url: https://research.google/blog/rss/
+    language: en
+    category:
+      - Research
+
+  - name: Anthropic News (非官方镜像)                        # 新增
+    type: rss
+    url: https://rsshub.bestblogs.dev/anthropic/news
+    language: en
+    category:
+      - Research
+      - Industry
+
+  - name: Simon Willison’s Weblog                           # 新增
+    type: rss
+    url: https://simonwillison.net/atom/everything/
+    language: en
+    category:
+      - Community
+      - Analysis
+
+  - name: AI Research Feed (聚合)                           # 新增
+    type: rss
+    url: https://github.com/0xSMW/rss-feeds/raw/main/feed_ai_research.xml
+    language: en
+    category:
+      - Aggregator
+      - Research
+  
+  - name: Microsoft Research Blog
+    type: rss
+    url: https://www.microsoft.com/en-us/research/blog/feed/
+    language: en
+    category:
+      - Research
+      - Industry
+  # ---------- 新增：中文 AI / 大模型垂直信源 ----------
+  - name: RadarAI 更新速报                                    # 新增
+    type: rss
+    url: https://radarai.top/updates
+    language: zh
+    category:
+      - Aggregator
+      - Industry
+
+  - name: InfoQ AI                                          # 新增
+    type: rss
+    url: https://www.infoq.cn/feed/ai
+    language: zh
+    category:
+      - Industry
+      - Tech
+  
+    - name: Ben's Bites
+    type: rss
+    url: https://www.bensbites.com/feed
+    language: en
+    category:
+      - Industry
+      - Aggregator
+    # 注：目前全球最受欢迎的 AI/大模型每日简报之一，专注 LLM 应用、工具评测与初创公司动态。
+
+  - name: MIT Technology Review (AI)
+    type: rss
+    url: https://www.technologyreview.com/topic/artificial-intelligence/feed/
+    language: en
+    category:
+      - Research
+      - Media
+    # 注：麻省理工科技评论 AI 专区，提供深度的技术趋势分析和调查报道。
+
+  - name: VentureBeat AI
+    type: rss
+    url: https://venturebeat.com/category/ai/feed/
+    language: en
+    category:
+      - Industry
+      - Media
+
+  - name: 新智元
+    type: rss
+    url: https://rsshub.app/weixin/catch/AI_era
+    language: zh
+    category:
+      - Industry
+      - Media
+    # 注：专注 AI 前沿技术与大模型产业落地。因微信公众号无原生 RSS，此处提供 RSSHub 转换链接。
+
+  - name: 智东西
+    type: rss
+    url: https://rsshub.app/weixin/catch/zhidx
+    language: zh
+    category:
+      - Industry
+      - Tech
+    # 注：聚焦 AI 前沿技术及其在千行百业（包括能源、制造等）的产业变革与应用落地。
+
+  - name: InfoQ (AI, ML & Data Engineering)
+    type: rss
+    url: https://feed.infoq.com/ai-ml-data-engineering/cn
+    language: zh
+    category:
+      - Tech
+      - Community
+    # 注：偏重工程实践，对大模型推理优化、服务器端处理逻辑、系统架构等深度技术文章质量很高。
+      - name: Papers with Code (Trending)
+    type: rss
+    url: https://paperswithcode.com/rss
+    language: en
+    category:
+      - Research
+      - OpenSource
+    # 注：追踪每日带有代码实现的最热门 AI 论文，是了解大模型新架构、3D 视觉、空间计算（与您关注的 MR/地质建模相关）的最佳窗口。
+
+  - name: Hugging Face Daily Papers
+    type: rss
+    url: https://huggingface.co/papers/rss
+    language: en
+    category:
+      - Research
+      - OpenSource

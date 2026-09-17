@@ -57,11 +57,8 @@ def get_daily_report(report_date: str) -> dict:
     """获取指定日期(YYYY-MM-DD)的每日新闻简报"""
     conn = get_connection()
     try:
-        # 🌟 修复：列名从 content 改为 report_json
-        cur = conn.execute("SELECT report_json FROM daily_reports WHERE report_date = ?", (report_date,))
-        row = cur.fetchone()
-        # 🌟 修复：使用 row[0] 获取第一列的值 (tuple 索引)
-        return {"content": row[0]} if row else {"content": None}
+        result = fetch_report_by_date(conn, report_date)
+        return result if result else {"content": None}
     finally:
         conn.close()
 

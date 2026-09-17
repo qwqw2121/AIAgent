@@ -155,3 +155,12 @@ def table_exists(conn, table_name: str) -> bool:
         (table_name,),
     ).fetchone()
     return row is not None
+
+# storage/db.py —— 新增
+def report_exists(conn, report_date: str) -> bool:
+    """检查指定日期的日报是否已存在"""
+    row = conn.execute(
+        "SELECT 1 FROM daily_reports WHERE report_date = ?",
+        (report_date,),
+    ).fetchone()
+    return row is not None

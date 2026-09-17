@@ -14,6 +14,7 @@ if str(ROOT_DIR) not in sys.path:
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from langchain_core.messages import HumanMessage
 
 from storage.db import (
     DB_PATH,
@@ -35,6 +36,8 @@ from backend.api.trends import router as trend_router
 # ============================================================
 # lifespan：启动时初始化 Agent（MCP stdio 连接 + 编译图，只做一次）
 # ============================================================
+from fastapi.responses import StreamingResponse
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # 建索引（幂等）
@@ -57,6 +60,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://77a35354.r16.cpolar.top",
     ],
     allow_credentials=True,
     allow_methods=["*"],
@@ -170,6 +174,41 @@ async def ask(req: AskRequest):
         "answer": result.get("answer", ""),
         "sources": result.get("sources", []),
     }
+
+
+@app.post("/api/chat")
+async def chat(req: AskRequest):
+    """Stream agent tokens and tool activity as Server-Sent Events."""
+    agent = getattr(app.state, "agent", None)
+    if agent is None:
+        raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
+
+    config = {"configurable": {"thread_id": req.session_id or "default"}}
+
+    async def event_stream():
+        try:
+            async for event in agent.astream_events(
+                {"messages": [HumanMessage(content=req.question)]},
+                config=config,
+                version="v2",
+            ):
+                event_type = event.get("event")
+                metadata = event.get("metadata") or {}
+                if event_type == "on_chat_model_stream" and metadata.get("langgraph_node") == "agent":
+                    content = getattr(event.get("data", {}).get("chunk"), "content", "")
+                    if content:
+                        yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                elif event_type == "on_tool_start":
+                    yield f"data: {json.dumps({'type': 'tool', 'name': event.get('name', '工具')}, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as error:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(error)}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+    )
 
 
 # ============================================================
