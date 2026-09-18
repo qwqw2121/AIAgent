@@ -19,18 +19,10 @@ load_dotenv()
 from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI
-from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from storage.db import get_connection, report_exists
-
-# LangGraph 的 RetryPolicy / Send 在不同版本里的导入路径不一样，做个兼容兜底。
-# 版本较旧时如果这里 import 失败，运行 `pip install -U langgraph` 即可。
-try:
-    from langgraph.types import RetryPolicy, Send
-except ImportError:  # 兼容旧版本 langgraph
-    from langgraph.pregel.types import RetryPolicy  # type: ignore
-    from langgraph.constants import Send  # type: ignore
 
 # ============================================================
 # 1. LLM 配置
@@ -117,145 +109,55 @@ async def request_daily_report(report_date: str, force: bool = False) -> str:
 
 
 # ============================================================
-# 3. 工具分组：把"检索类"和"日报类"彻底分开
+# 3. Agent 节点与工具环
 # ============================================================
-# 新工具接入时，只需要在这里登记一下属于哪个组即可；
-# 没登记的工具默认归入 SEARCH 组（比默默丢失路由更安全）。
-GROUP_SEARCH = "search"
-GROUP_REPORT = "report"
-
-TOOL_GROUP_MAP = {
-    "search_news_semantic": GROUP_SEARCH,
-    "search_news": GROUP_SEARCH,
-    "get_daily_report": GROUP_REPORT,
-    "request_daily_report": GROUP_REPORT,
-}
-
-# 每组独立的超时/重试配置，互不影响，以后要调也只改这一处
-GROUP_CONFIG = {
-    GROUP_SEARCH: {"timeout_seconds": 20, "retry": RetryPolicy(max_attempts=2)},
-    GROUP_REPORT: {"timeout_seconds": 20, "retry": RetryPolicy(max_attempts=1)},
-}
-
-TOOLS: list = []            # 全部工具（供 LLM bind_tools 使用）
-SEARCH_TOOLS: list = []     # search 组的工具实例
-REPORT_TOOLS: list = []     # report 组的工具实例
-SYSTEM_MSG = None
-app = None
+TOOLS = []          # 由 init_agent 填充：MCP 工具 + 本地工具
+SYSTEM_MSG = None   # init 时注入当天日期
+app = None          # 编译后的 Graph 实例
 
 
-def _split_tools_by_group(all_tools):
-    search_tools, report_tools = [], []
-    for t in all_tools:
-        group = TOOL_GROUP_MAP.get(t.name, GROUP_SEARCH)
-        (search_tools if group == GROUP_SEARCH else report_tools).append(t)
-    return search_tools, report_tools
-
-
-# ============================================================
-# 4. Agent 节点
-# ============================================================
 async def agent_node(state: MessagesState):
     response = await agent_llm.ainvoke([SYSTEM_MSG] + state["messages"])
     return {"messages": [response]}
 
 
-async def _run_tool_group(state: MessagesState, group_tools: list, group_name: str):
-    """只执行属于 group_name 这一组的 tool_calls，独立超时+由节点级 RetryPolicy 负责重试。"""
+def should_continue(state: MessagesState):
     last = state["messages"][-1]
-    calls = [c for c in (getattr(last, "tool_calls", None) or [])
-             if TOOL_GROUP_MAP.get(c["name"], GROUP_SEARCH) == group_name]
-    if not calls:
-        return {"messages": []}
-
-    node = ToolNode(group_tools)
-    # 只把属于本组的 tool_calls 交给 ToolNode，避免和另一组重复执行
-    trimmed = AIMessage(content="", tool_calls=calls)
-    timeout_seconds = GROUP_CONFIG[group_name]["timeout_seconds"]
-
-    try:
-        result = await asyncio.wait_for(
-            node.ainvoke({"messages": [trimmed]}), timeout=timeout_seconds
-        )
-        return result
-    except asyncio.TimeoutError:
-        print(f"⏱️ [{group_name}] 工具组执行超时（{timeout_seconds}s），涉及 {[c['name'] for c in calls]}")
-        # 超时也要给每个 tool_call 一个 ToolMessage 兜底，否则 LLM 侧会因缺少对应回复而报错
-        return {
-            "messages": [
-                ToolMessage(
-                    content=f"[{group_name} 工具组执行超时（{timeout_seconds}s），请稍后重试]",
-                    tool_call_id=c["id"],
-                    name=c["name"],
-                )
-                for c in calls
-            ]
-        }
-
-
-async def tools_search_node(state: MessagesState):
-    return await _run_tool_group(state, SEARCH_TOOLS, GROUP_SEARCH)
-
-
-async def tools_report_node(state: MessagesState):
-    return await _run_tool_group(state, REPORT_TOOLS, GROUP_REPORT)
-
-
-def route_after_agent(state: MessagesState):
-    """
-    用 recursion_limit（见 build_graph/main 的 config）替代原来手写的
-    `len(messages) > 20` 轮数上限——LangGraph 会在超过限制时抛出
-    GraphRecursionError，比静默截断更明确、更容易排查。
-
-    这里只负责判断本轮涉及哪些工具组，并用 Send 并行分发：
-    如果模型同一轮里既要检索又要读日报，两组会同时跑，不用排队。
-    """
-    last = state["messages"][-1]
-    tool_calls = getattr(last, "tool_calls", None)
-    if not tool_calls:
+    # 防止模型无限循环调用工具
+    if len(state["messages"]) > 20:
+        print("⚠️ 达到消息轮数上限，强制结束")
         return END
-
-    groups_present = {TOOL_GROUP_MAP.get(c["name"], GROUP_SEARCH) for c in tool_calls}
-    node_name = {GROUP_SEARCH: "tools_search", GROUP_REPORT: "tools_report"}
-    return [Send(node_name[g], state) for g in groups_present]
+    return "tools" if getattr(last, "tool_calls", None) else END
 
 
 def build_graph(checkpointer):
     """构建并编译 Graph，接收已经实例化的 checkpointer"""
     g = StateGraph(MessagesState)
     g.add_node("agent", agent_node)
-    g.add_node("tools_search", tools_search_node, retry_policy=GROUP_CONFIG[GROUP_SEARCH]["retry"])
-    g.add_node("tools_report", tools_report_node, retry_policy=GROUP_CONFIG[GROUP_REPORT]["retry"])
+    g.add_node("tools", ToolNode(TOOLS))
 
     g.set_entry_point("agent")
-    g.add_conditional_edges(
-        "agent",
-        route_after_agent,
-        {"tools_search": "tools_search", "tools_report": "tools_report", END: END},
-    )
-    g.add_edge("tools_search", "agent")
-    g.add_edge("tools_report", "agent")
-
+    g.add_conditional_edges("agent", should_continue, {"tools": "tools", END: END})
+    g.add_edge("tools", "agent")
+    
     # 传入具体的 checkpointer 实例
     return g.compile(checkpointer=checkpointer)
 
 
 async def _make_async_checkpointer():
-    """异步多轮记忆。依赖: pip install langgraph-checkpoint-sqlite aiosqlite
-    注意：这里的存储结构（chat_memory.db + MessagesState）完全没变，
-    所以昨天及之前的聊天记录/ thread_id 都能正常继续使用，不受本次重构影响。"""
+    """异步多轮记忆。依赖: pip install langgraph-checkpoint-sqlite aiosqlite"""
     try:
         db_path = os.path.join(project_root, "chat_memory.db")
-
+        
         # 1. 建立异步数据库连接 (check_same_thread=False 适配 FastAPI/异步环境)
         conn = await aiosqlite.connect(db_path)
-
+        
         # 2. 实例化异步 Checkpointer
         saver = AsyncSqliteSaver(conn)
-
+        
         # 3. 【关键】异步初始化表结构 (首次运行会自动建表)
         await saver.setup()
-
+        
         return saver
     except ImportError:
         print("⚠️ 未安装 langgraph-checkpoint-sqlite 或 aiosqlite，多轮记忆不可用，使用无记忆模式")
@@ -266,7 +168,7 @@ async def _make_async_checkpointer():
 
 
 # ============================================================
-# 5. 独立分析入口（保持原有）
+# 4. 独立分析入口（保持原有）
 # ============================================================
 def run_analyst(title: str, content: str) -> dict:
     from agent.news_analyzer import analyze_news
@@ -274,10 +176,10 @@ def run_analyst(title: str, content: str) -> dict:
 
 
 # ============================================================
-# 6. 初始化 + 测试
+# 5. 初始化 + 测试
 # ============================================================
 async def init_agent():
-    global TOOLS, SEARCH_TOOLS, REPORT_TOOLS, SYSTEM_MSG, agent_llm, app
+    global TOOLS, SYSTEM_MSG, agent_llm, app
 
     client = MultiServerMCPClient({
         "news_mcp": {
@@ -289,24 +191,21 @@ async def init_agent():
     })
     mcp_tools = await client.get_tools()
     TOOLS = list(mcp_tools) + [request_daily_report]
-    SEARCH_TOOLS, REPORT_TOOLS = _split_tools_by_group(TOOLS)
     print(f"✅ 加载工具: {[t.name for t in TOOLS]}")
-    print(f"   ├─ search 组: {[t.name for t in SEARCH_TOOLS]}")
-    print(f"   └─ report 组: {[t.name for t in REPORT_TOOLS]}")
 
     agent_llm = agent_llm.bind_tools(TOOLS)
     SYSTEM_MSG = SystemMessage(SYSTEM_PROMPT.format(today=date.today().isoformat()))
 
     # 1. 先异步获取 checkpointer 实例
     checkpointer = await _make_async_checkpointer()
-
+    
     # 2. 构建并编译 Graph
     app = build_graph(checkpointer)
     return app
 
 
 async def main():
-    print("🚀 启动 Agent (Tool Calling 模式，检索/日报工具组隔离)...\n")
+    print("🚀 启动 Agent (Tool Calling 模式)...\n")
     app_instance = await init_agent()
 
     # 单轮测试
@@ -316,26 +215,13 @@ async def main():
         # "整理一下最近AI芯片行业的进展",
         "帮我生成 2026-09-01 的日报",
     ]
-
+    
     for q in tests:
         print(f"\n=== 提问: {q} ===")
-        try:
-            r = await app_instance.ainvoke(
-                {"messages": [HumanMessage(content=q)]},
-                config={
-                    "configurable": {"thread_id": f"test-{hash(q) % 10000}"},
-                    # 用官方的 recursion_limit 替代手写的 len(messages) > 20：
-                    # 每个 agent<->tools 往返算若干个 step，超限会抛出
-                    # GraphRecursionError，而不是被 should_continue 悄悄截断。
-                    "recursion_limit": 15,
-                },
-            )
-        except Exception as e:
-            # GraphRecursionError 等异常会在这里被捕获，方便你区分
-            # “正常没结果” 和 “死循环被熔断” 两种情况
-            print(f"❌ 执行失败: {type(e).__name__}: {e}")
-            continue
-
+        r = await app_instance.ainvoke(
+            {"messages": [HumanMessage(content=q)]},
+            config={"configurable": {"thread_id": f"test-{hash(q) % 10000}"}},
+        )
         # 打印回答，限制长度避免刷屏，并加上省略号
         full_answer = r["messages"][-1].content
         print("回答:", full_answer[:400] + ("..." if len(full_answer) > 400 else ""))

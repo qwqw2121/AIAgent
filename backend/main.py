@@ -5,6 +5,7 @@ from pathlib import Path
 from datetime import date, datetime
 from contextlib import closing, asynccontextmanager
 from typing import Optional
+import sqlite3
 
 # 添加项目根目录到 sys.path（而不是 backend 目录）
 ROOT_DIR = Path(__file__).parent.parent
@@ -32,6 +33,7 @@ from backend.api.reports import router as reports_router
 from backend.api.rag import router as rag_router
 from backend.api.trends import router as trend_router
 
+from storage.db import get_connection
 
 # ============================================================
 # lifespan：启动时初始化 Agent（MCP stdio 连接 + 编译图，只做一次）
@@ -77,9 +79,11 @@ app.include_router(trend_router)
 app.include_router(news_router)
 
 def get_db():
-    """FastAPI 依赖注入：每个请求一个连接，保证关闭"""
-    with closing(get_connection()) as conn:
+    conn = get_connection()
+    try:
         yield conn
+    finally:
+        conn.close()
 
 
 def enrich_report_news(conn, report):

@@ -11,11 +11,17 @@ def get_connection():
     # 确保存放数据库文件的目录存在
     os.makedirs(os.path.dirname(os.path.abspath(DB_PATH)), exist_ok=True)
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(
+        DB_PATH,
+        timeout=30,
+        check_same_thread=False,  # FastAPI 可能把 enter/endpoint/close 分配到不同线程
+    )
     # 关键：设置 row_factory 为 sqlite3.Row，使得查询结果可以像字典一样通过列名访问
     conn.row_factory = sqlite3.Row
     # 开启外键约束（好习惯）
     conn.execute("PRAGMA foreign_keys = ON")
+    # 可选但推荐：减少写锁等待
+    conn.execute("PRAGMA busy_timeout = 30000")
     return conn
 
 def init_db():
