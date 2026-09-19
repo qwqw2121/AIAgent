@@ -1,15 +1,6 @@
 services:
-  postgres:
-    image: pgvector/pgvector:pg16
-    environment:
-      POSTGRES_USER: news
-      POSTGRES_PASSWORD: news_pwd
-      POSTGRES_DB: news_db
-    ports:
-      - "5432:5432"
-    volumes:
-      - pg_data:/var/lib/postgresql/data
-  # 1. 后端 (FastAPI)
+
+  # 1. 后端 (FastAPI + LangGraph Agent，MCP 作为子进程运行在同一容器内)
   backend:
     build:
       context: .
@@ -24,6 +15,8 @@ services:
       - .env
     environment:
       BGE_MODEL_PATH: /app/models/bge-m3
+      # LLM_API_KEY / LLM_BASE_URL / LLM_ROUTER / LLM_GENERATOR 从 .env 读取
+      PYTHONUNBUFFERED: "1"   # 让 MCP 子进程的 print() 日志实时刷新到 stdout
     networks:
       - ai-network
 
@@ -56,11 +49,11 @@ services:
     networks:
       - ai-network
 
-  # 4. Prefect Worker (干活的工人)
+  # 4. Prefect Worker (复用 backend 镜像，因为 daily_flow 依赖同一套代码/依赖)
   prefect-worker:
     build:
       context: .
-      dockerfile: docker/backend/Dockerfile # 复用后端的镜像，因为需要相同的 Python 环境
+      dockerfile: docker/backend/Dockerfile
     command: /bin/sh /app/docker/prefect/start-worker.sh
     volumes:
       - ./storage:/app/storage
@@ -81,5 +74,4 @@ networks:
     driver: bridge
 
 volumes:
-  prefect_data: # 定义 Prefect 的数据卷
-  pg_data: # 定义 PostgreSQL 的数据卷
+  prefect_data:

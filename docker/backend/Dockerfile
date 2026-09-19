@@ -28,13 +28,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-COPY agent ./agent
-COPY backend ./backend
-COPY config ./config
-COPY embedding ./embedding
-COPY ingestion ./ingestion
-COPY pipeline ./pipeline
-COPY sources ./sources
+
+COPY . .
 
 # 6. 暴露 FastAPI 端口
 EXPOSE 8000

@@ -6,6 +6,9 @@ python-dotenv
 feedparser
 langchain
 langgraph
+langchain-openai
+langchain-mcp-adapters
+mcp
 langchain-community
 pydantic-settings
 httpx
