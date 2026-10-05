@@ -300,8 +300,8 @@ def process_news(news_id):
     )
 
     if existing_event:
-
-        return existing_event
+        _mark_clustered(news_id)                      # ⭐ 补上
+        return existing_event, "existing"
 
     # --------------------------------------------------------
     # 从 Chroma 找相似新闻
@@ -314,13 +314,9 @@ def process_news(news_id):
 
     embeddings = result["embeddings"]
 
-    if not embeddings:
-
-        print(
-            f"news_id={news_id} 没有Embedding"
-        )
-
-        return None
+    if embeddings is None or len(embeddings) == 0:    # 避免 numpy 数组的布尔判断歧义
+        print(f"news_id={news_id} 没有Embedding")
+        return None, "no_embedding"
 
     embedding = embeddings[0]
 
@@ -381,43 +377,17 @@ def process_news(news_id):
     '''事件匹配逻辑在"多个候选事件"时的选择策略，可能导致同一事件被拆分成多个'''
     # --------------------------------------------------------
     if event_candidates:
+            event_id, similarity = max(event_candidates, key=lambda x: x[1])
+            add_news_to_event(event_id, news_id, similarity)
+            _mark_clustered(news_id)
+            print(f"news_id={news_id} → Event {event_id} similarity={similarity:.3f}")
+            return event_id, "joined"
 
-        event_id, similarity = max(
-            event_candidates,
-            key=lambda x: x[1]
-        )
+    event_id = create_new_event(news_id)
+    _mark_clustered(news_id)
+    print(f"news_id={news_id} → 创建新事件 Event {event_id}")
+    return event_id, "new"
 
-        add_news_to_event(
-            event_id,
-            news_id,
-            similarity
-        )
-
-        _mark_clustered(news_id)   # ⭐ 新增
-        
-        print(
-            f"news_id={news_id}"
-            f" → Event {event_id}"
-            f" similarity={similarity:.3f}"
-        )
-
-        return event_id
-
-    # --------------------------------------------------------
-    # 没有匹配事件
-    # --------------------------------------------------------
-
-    event_id = create_new_event(
-        news_id
-    )
-
-    print(
-        f"news_id={news_id}"
-        f" → 创建新事件 Event {event_id}"
-    )
-
-    _mark_clustered(news_id)   # ⭐ 新增无论归入已有事件还是新建事件，处理完都要推进
-    return event_id
 
 def _mark_clustered(news_id):
     conn = sqlite3.connect(DB_PATH)
@@ -429,49 +399,37 @@ def _mark_clustered(news_id):
 # 处理所有 analyzed / embedded 新闻
 # ============================================================
 
-def run():
-
-    conn = sqlite3.connect(DB_PATH)
-
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        SELECT id
-        FROM news
-        WHERE status = 'embedded'
-        ORDER BY id
-        """
-    )
-
-    news_ids = [
-        row[0]
-        for row in cursor.fetchall()
-    ]
-
+def run(start_ts=None, end_ts=None):
+    conn = sqlite3.connect(DB_PATH, timeout=30)
+    sql = "SELECT id FROM news WHERE status = 'embedded' AND is_duplicate = 0"
+    params = []
+    if start_ts is not None:
+        sql += " AND published_ts >= ? AND published_ts < ?"
+        params = [start_ts, end_ts]
+    sql += " ORDER BY published_ts, id"
+    news_ids = [r[0] for r in conn.execute(sql, params)]
     conn.close()
 
-    print(
-        f"待匹配事件新闻：{len(news_ids)}"
-    )
-    new_events, joined_existing, failed = 0, 0, 0
+    new_events = joined = existing = failed = 0
     for news_id in news_ids:
-
         try:
-
-            process_news(
-                news_id
-            )
-
+            event_id, kind = process_news(news_id)
+            if kind == "new":
+                new_events += 1
+            elif kind == "joined":
+                joined += 1
+            elif kind == "existing":
+                existing += 1
+            else:
+                failed += 1
         except Exception as e:
+            failed += 1
+            print(f"[失败] news_id={news_id}: {e}", flush=True)
 
-            print(
-                f"[失败] news_id={news_id}: {e}"
-            )
-    return {   # ⭐ 新增返回值
+    return {
         "total": len(news_ids),
         "new_events": new_events,
-        "joined_existing": joined_existing,
+        "joined_existing": joined + existing,
         "failed": failed,
     }
 

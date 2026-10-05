@@ -69,3 +69,12 @@ Embedding
 相似度低
     ↓
 创建新事件
+
+# 日常(cron 每 3 小时一次)
+python pipeline/flows/update_flow.py
+
+# 按月抓取补漏
+python pipeline/flows/update_flow.py --mode month --year 2026 --month 9
+
+# 第一次清存量时多分析一些
+python pipeline/flows/update_flow.py --max-analyze 500

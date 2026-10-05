@@ -122,22 +122,16 @@ def build_embedding_text(row):
     
     # 🚨 确保绝不返回空字符串
     return text if text else "无有效内容"
+
 def load_news():
-    """从 SQLite 读取待向量化的新闻"""
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
-
-    # 注意：这里假设你的状态是 'analyzed'，如果是 'embed_failed' 请自行修改
-    cursor.execute("""
-        SELECT id, title, summary, llm_category, keywords, 
-               source, category, published
-        FROM news 
-        WHERE status = 'analyzed' OR status = 'embed_failed'
+    rows = conn.execute("""
+        SELECT id, title, summary, llm_category, keywords, source, category, published
+        FROM news
+        WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
         ORDER BY id
-    """)
-
-    rows = cursor.fetchall()
+    """).fetchall()
     conn.close()
     return rows
 
@@ -169,11 +163,11 @@ def test_embedding():
         print(f"   ❌ 测试失败")
         return False
 
-def run():
+def run(start_ts, end_ts):
     """主流程：生成所有新闻的向量"""
     if not test_embedding():
         print("❌ Embedding 测试失败，请检查配置")
-        return
+        return {"total": 0, "success": 0, "failed": 0, "error": "embedding test failed"}
     
     news_list = load_news()
     print(f"\n📊 待向量化新闻：{len(news_list)} 条")
@@ -184,7 +178,9 @@ def run():
     for i, row in enumerate(news_list, 1):
         news_id = row["id"]
         print(f"\n[{i}/{len(news_list)}] 处理 ID={news_id}")
-        
+
+        news_list = load_news(start_ts, end_ts)
+
         try:
             # 1. 构造文本
             embedding_text = build_embedding_text(row)

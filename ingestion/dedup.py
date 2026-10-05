@@ -29,9 +29,6 @@ from pathlib import Path
 import os
 DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
-TITLE_SIM_THRESHOLD = 0.85  # difflib相似度阈值,超过视为同一事件
-
-
 def ensure_columns(conn):
     cursor = conn.execute("PRAGMA table_info(news)")
     existing_cols = {row[1] for row in cursor.fetchall()}
@@ -44,101 +41,108 @@ def ensure_columns(conn):
         conn.execute(sql)
     if to_add:
         conn.commit()
+        
+TITLE_SIM_THRESHOLD = 0.85  # difflib相似度阈值,超过视为同一事件
+DONE = "status NOT IN ('raw','extract_failed')"   # 已提取过正文的记录
+
+def _fetch_window(conn, start_ts, end_ts):
+    """窗口内所有未被标重、已提取的记录(含已 deduped 的),用作对照"""
+    return conn.execute(f"""
+        SELECT id, title, title_hash, status, published_ts FROM news
+        WHERE is_duplicate = 0 AND {DONE}
+          AND published_ts >= ? AND published_ts < ?
+        ORDER BY id
+    """, (start_ts, end_ts)).fetchall()
 
 
-def dedup_exact(conn):
-    """按 title_hash 精确去重,同hash只留id最小的一条"""
-    rows = conn.execute("""
-        SELECT id, title_hash FROM news
-        WHERE status IN ('extracted')
-        AND is_duplicate = 0
-          
-    """).fetchall()
+def _mark_dup(conn, dup_id, keep_id):
+    conn.execute(
+        "UPDATE news SET is_duplicate=1, duplicate_of=?, status='duplicate' WHERE id=?",
+        (keep_id, dup_id),
+    )
 
+
+
+def dedup_exact(conn, start_ts, end_ts):
     groups = defaultdict(list)
-    for news_id, title_hash in rows:
-        if title_hash:  # 防止空hash的记录被误分到同一组
-            groups[title_hash].append(news_id)
+    for id_, _t, h, st, _ts in _fetch_window(conn, start_ts, end_ts):
+        if h:
+            groups[h].append((id_, st))
 
-    dup_count = 0
-    for title_hash, ids in groups.items():
-        if len(ids) <= 1:
+    n = 0
+    for items in groups.values():
+        if len(items) < 2:
             continue
-        ids_sorted = sorted(ids)
-        keep_id = ids_sorted[0]
-        for dup_id in ids_sorted[1:]:
-            conn.execute(
-                "UPDATE news SET is_duplicate=1, duplicate_of=? WHERE id=?",
-                (keep_id, dup_id),
-            )
-            dup_count += 1
-
+        # 优先保留已经处理过的,其次保留 id 最小的
+        processed = [i for i, st in items if st != "extracted"]
+        keep = min(processed) if processed else min(i for i, _ in items)
+        for id_, st in items:
+            if id_ != keep and st == "extracted":   # 只标记待处理的,不动已处理的
+                _mark_dup(conn, id_, keep)
+                n += 1
     conn.commit()
-    print(f"精确去重(title_hash): 标记 {dup_count} 条重复")
+    return n
 
 
-def title_similarity(a, b):
-    return difflib.SequenceMatcher(None, a, b).ratio()
-
-
-def dedup_fuzzy(conn):
-    """同一天内标题模糊相似度聚类"""
-    rows = conn.execute("""
-        SELECT id, title, published_ts FROM news
-        WHERE extract_status IN ('ok_trafilatura', 'ok_readability')
-          AND is_duplicate = 0
-    """).fetchall()
-
-    # 按发布日期分桶,减少两两比较规模
-    buckets = defaultdict(list)
-    for news_id, title, published_ts in rows:
-        if published_ts:
-            day = datetime.utcfromtimestamp(published_ts).strftime("%Y-%m-%d")
-        else:
-            day = "unknown"
-        buckets[day].append((news_id, title))
-
-    dup_count = 0
-    for day, items in buckets.items():
-        items = sorted(items, key=lambda x: x[0])  # 按id排序,保留更早入库的
-        n = len(items)
-        marked_dup = set()
-
-        for i in range(n):
-            if items[i][0] in marked_dup:
+def dedup_fuzzy(conn, start_ts, end_ts):
+    items = _fetch_window(conn, start_ts, end_ts)
+    # 精确去重已经标过的不在 items 里了(is_duplicate=1),不用额外处理
+    marked, n = set(), 0
+    for j in range(len(items)):
+        id_j, title_j, _h, st_j, _ts = items[j]
+        if st_j != "extracted" or id_j in marked:
+            continue
+        for i in range(j):
+            id_i, title_i = items[i][0], items[i][1]
+            if id_i in marked:
                 continue
-            for j in range(i + 1, n):
-                if items[j][0] in marked_dup:
-                    continue
-                sim = title_similarity(items[i][1], items[j][1])
-                if sim >= TITLE_SIM_THRESHOLD:
-                    conn.execute(
-                        "UPDATE news SET is_duplicate=1, duplicate_of=? WHERE id=?",
-                        (items[i][0], items[j][0]),
-                    )
-                    marked_dup.add(items[j][0])
-                    dup_count += 1
-
+            sm = difflib.SequenceMatcher(None, title_i, title_j)
+            if (sm.real_quick_ratio() >= TITLE_SIM_THRESHOLD
+                    and sm.quick_ratio() >= TITLE_SIM_THRESHOLD
+                    and sm.ratio() >= TITLE_SIM_THRESHOLD):
+                _mark_dup(conn, id_j, id_i)
+                marked.add(id_j)
+                n += 1
+                break
     conn.commit()
-    print(f"模糊去重(标题相似度): 标记 {dup_count} 条重复")
+    return n
 
-def mark_deduped(conn):
-    """去重完成后，把未被标记为重复的记录状态推进到 deduped"""
-    conn.execute("""
-        UPDATE news SET status = 'deduped'
-        WHERE status = 'extracted' AND is_duplicate = 0
-    """)
+
+def mark_deduped(conn, start_ts, end_ts):
+    cur = conn.execute("""
+        UPDATE news SET status='deduped'
+        WHERE status='extracted' AND is_duplicate=0
+          AND published_ts >= ? AND published_ts < ?
+    """, (start_ts, end_ts))
     conn.commit()
+    return cur.rowcount
+
+
+from pipeline.utils import day_bounds_ts, SQL_TZ
 
 def run():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     ensure_columns(conn)
 
-    dedup_exact(conn)   # 先做精确去重,减少后面模糊比较的数据量
-    dedup_fuzzy(conn)
-    mark_deduped(conn)   # ⭐ 新增
+    days = [r[0] for r in conn.execute(f"""
+        SELECT DISTINCT date(published_ts,'unixepoch','{SQL_TZ}')
+        FROM news
+        WHERE status='extracted' AND published_ts IS NOT NULL
+        ORDER BY 1
+    """)]
+
+    exact = fuzzy = survived = 0
+    for day in days:
+        s, e = day_bounds_ts(day)
+        exact += dedup_exact(conn, s, e)
+        fuzzy += dedup_fuzzy(conn, s, e)
+        survived += mark_deduped(conn, s, e)
+
+    # 没有发布时间的数据直接放行,避免永远卡在 extracted
+    conn.execute("UPDATE news SET status='deduped' WHERE status='extracted' AND published_ts IS NULL")
+    conn.commit()
     conn.close()
-    print("去重完成")
+    return {"days": len(days), "exact_dup": exact, "fuzzy_dup": fuzzy, "survived": survived}
 
 
 if __name__ == "__main__":

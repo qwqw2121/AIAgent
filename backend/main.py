@@ -6,6 +6,8 @@ from datetime import date, datetime
 from contextlib import closing, asynccontextmanager
 from typing import Optional
 import sqlite3
+from backend.deps import get_db
+import uuid
 
 # 添加项目根目录到 sys.path（而不是 backend 目录）
 ROOT_DIR = Path(__file__).parent.parent
@@ -77,13 +79,6 @@ app.include_router(reports_router)
 app.include_router(rag_router)
 app.include_router(trend_router)
 app.include_router(news_router)
-
-def get_db():
-    conn = get_connection()
-    try:
-        yield conn
-    finally:
-        conn.close()
 
 
 def enrich_report_news(conn, report):
@@ -157,27 +152,39 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1, description="用户问题")
     session_id: Optional[str] = Field(None, description="会话 ID，可选，便于前端追踪")
 
-
 @app.post("/api/ask")
 async def ask(req: AskRequest):
-    """自然语言问答入口：内部由 LangGraph Agent 路由（知识检索 / 日报简报）"""
     agent = getattr(app.state, "agent", None)
     if agent is None:
-        raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
-
+        raise HTTPException(503, "问答 Agent 未初始化")
+    config = {"configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
+              "recursion_limit": 15}
     try:
-        result = await agent.ainvoke({"question": req.question})
+        result = await agent.ainvoke({"messages": [HumanMessage(content=req.question)]}, config=config)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Agent 调用失败: {e}")
+        raise HTTPException(500, f"Agent 调用失败: {e}")
+    return {"question": req.question, "session_id": req.session_id,
+            "answer": result["messages"][-1].content}
+# @app.post("/api/ask")
+# async def ask(req: AskRequest):
+#     """自然语言问答入口：内部由 LangGraph Agent 路由（知识检索 / 日报简报）"""
+#     agent = getattr(app.state, "agent", None)
+#     if agent is None:
+#         raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
 
-    return {
-        "question": req.question,
-        "session_id": req.session_id,
-        "route": result.get("route"),
-        "report_date": result.get("report_date"),
-        "answer": result.get("answer", ""),
-        "sources": result.get("sources", []),
-    }
+#     try:
+#         result = await agent.ainvoke({"question": req.question})
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Agent 调用失败: {e}")
+
+#     return {
+#         "question": req.question,
+#         "session_id": req.session_id,
+#         "route": result.get("route"),
+#         "report_date": result.get("report_date"),
+#         "answer": result.get("answer", ""),
+#         "sources": result.get("sources", []),
+#     }
 
 
 @app.post("/api/chat")
@@ -229,6 +236,14 @@ def get_today_daily_report(conn=Depends(get_db)):
         raise HTTPException(status_code=404, detail="今日日报尚未生成")
     return report_response(conn, row)
 
+@app.get("/api/daily-report/latest")
+def get_latest_daily_report(conn=Depends(get_db)):
+    row = conn.execute(
+        "SELECT * FROM daily_reports ORDER BY report_date DESC LIMIT 1"
+    ).fetchone()
+    if not row:
+        raise HTTPException(404, "暂无日报")
+    return report_response(conn, row)
 
 # 2. 静态：日期范围
 @app.get("/api/daily-report/range")

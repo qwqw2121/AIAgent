@@ -124,57 +124,82 @@ def analyze_news(title: str, content: str) -> dict:
     return json.loads(response.choices[0].message.content)
 
 
+def fetch_window(conn, start_ts, end_ts, limit=None):
+    sql = """SELECT * FROM news
+             WHERE status IN ('deduped', 'analyze_failed')
+               AND is_duplicate = 0
+               AND published_ts >= ? AND published_ts < ?
+             ORDER BY id"""
+    params = [start_ts, end_ts]
+    if limit:
+        sql += " LIMIT ?"
+        params.append(limit)
+    cur = conn.execute(sql, params)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
 def _analyze_one(row, max_retry):
     content = row.get("content") or row.get("summary") or ""
-    with _rate_limiter:
-        result = None
-        for attempt in range(max_retry + 1):
-            try:
-                result = analyze_news(row["title"], content)
-                break
-            except Exception as e:
-                print(f"  ⚠️ id={row['id']} 第{attempt+1}次调用失败: {e}")
-                if attempt < max_retry:
-                    time.sleep(2)
-        time.sleep(1.0 / RATE_LIMIT_PER_SEC)
+    result = None
+    for attempt in range(max_retry + 1):
+        try:
+            result = analyze_news(row["title"], content)
+            break
+        except Exception as e:
+            print(f"  ⚠️ id={row['id']} 第{attempt+1}次失败: {e}", flush=True)
+            time.sleep(2)
+    time.sleep(1.0 / RATE_LIMIT_PER_SEC)
     return row["id"], result
 
-def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
+
+def fetch_pending(conn, max_items, per_source_cap):
+    cur = conn.execute("""
+        SELECT * FROM (
+            SELECT n.*,
+                   ROW_NUMBER() OVER (PARTITION BY source ORDER BY published_ts DESC) AS rn
+            FROM news n
+            WHERE status IN ('deduped', 'analyze_failed') AND is_duplicate = 0
+        )
+        WHERE rn <= ?
+        ORDER BY published_ts DESC
+        LIMIT ?
+    """, (per_source_cap, max_items))
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+
+def run(max_items=150, per_source_cap=30, max_retry=2):
     conn = get_connection()
     try:
-        rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
+        rows = fetch_pending(conn, max_items, per_source_cap)
         if not rows:
-            print("✅ 没有待分析或可重试的新闻")
             return {"total": 0, "success": 0, "failed": 0}
 
-        print(f"📊 待LLM分析/重试: {len(rows)} 条")
-        success_count, fail_count = 0, 0
-
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            futures = {
-                executor.submit(_analyze_one, row, max_retry): row
-                for row in rows
-            }
-            for i, future in enumerate(as_completed(futures), 1):
-                news_id, result = future.result()
+        ok = fail = 0
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+            futures = {ex.submit(_analyze_one, r, max_retry): r for r in rows}
+            for i, fut in enumerate(as_completed(futures), 1):
+                try:
+                    news_id, result = fut.result()
+                except Exception as e:
+                    news_id, result = futures[fut]["id"], None
+                    print(f"  ❌ id={news_id} 异常: {e}", flush=True)
 
                 if result is None:
                     update_fields(conn, news_id, {"status": "analyze_failed"})
-                    fail_count += 1
-                    print(f"[{i}/{len(rows)}] id={news_id} ❌ 分析失败")
-                    continue
-
-                update_fields(conn, news_id, {
-                    "summary": result.get("summary", ""),
-                    "llm_category": result.get("category", ""),
-                    "keywords": result.get("keywords", []),
-                    "importance": result.get("importance", 1),
-                    "status": "analyzed",
-                })
-                success_count += 1
-                print(f"[{i}/{len(rows)}] id={news_id} ✅ {result.get('category','N/A')}")
-
-        return {"total": len(rows), "success": success_count, "failed": fail_count}
+                    fail += 1
+                else:
+                    update_fields(conn, news_id, {
+                        "summary": result.get("summary", ""),
+                        "llm_category": result.get("category", ""),
+                        "keywords": result.get("keywords", []),
+                        "importance": result.get("importance", 1),
+                        "status": "analyzed",
+                    })
+                    ok += 1
+                print(f"[{i}/{len(rows)}] id={news_id} {'✅' if result else '❌'}", flush=True)
+        return {"total": len(rows), "success": ok, "failed": fail}
     finally:
         conn.close()
 #串行

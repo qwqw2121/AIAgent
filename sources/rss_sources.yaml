@@ -145,7 +145,7 @@ sources:
       - Industry
       - Tech
   
-    - name: Ben's Bites
+  - name: Ben's Bites
     type: rss
     url: https://www.bensbites.com/feed
     language: en

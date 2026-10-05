@@ -80,82 +80,59 @@ def init_daily_report_table():
 
 from email.utils import parsedate_to_datetime
 
-def get_news_by_date(report_date):
-    """
-    根据日期获取新闻。
+from datetime import datetime, date, timedelta, timezone
 
-    report_date:
-        例如：2026-08-12
-    """
+REPORT_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
+MAX_NEWS_FOR_LLM = 50
 
+
+def _day_range_ts(report_date: str):
+    d = date.fromisoformat(report_date)
+    start = datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
+    return int(start.timestamp()), int((start + timedelta(days=1)).timestamp())
+
+
+from pipeline.utils import day_bounds_ts, SQL_TZ
+
+READY = ("clustered", "reported")      # 已走完全部处理的新闻
+MAX_NEWS_FOR_LLM = 50
+
+
+def find_pending_dates(limit=10):
+    """有 clustered(还没进日报)新闻的日期,最新的优先"""
     conn = get_db()
-    cursor = conn.cursor()
+    rows = conn.execute(f"""
+        SELECT date(published_ts,'unixepoch','{SQL_TZ}') AS d, COUNT(*)
+        FROM news
+        WHERE status = 'clustered' AND is_duplicate = 0
+          AND summary IS NOT NULL AND importance IS NOT NULL
+          AND published_ts IS NOT NULL
+        GROUP BY d
+        ORDER BY d DESC
+        LIMIT ?
+    """, (limit,)).fetchall()
+    conn.close()
+    return [r[0] for r in rows]
 
-    cursor.execute("""
-        SELECT
-            id,
-            title,
-            source,
-            published,
-            summary,
-            llm_category,
-            keywords,
-            importance,
-            url,
-            status,
-            is_duplicate
+def get_news_by_date(report_date):
+    start_ts, end_ts = day_bounds_ts(report_date)
+    ph = ",".join("?" * len(READY))
+    conn = get_db()
+    rows = conn.execute(f"""
+        SELECT id, title, source, published, summary, llm_category,
+               keywords, importance, url, status
         FROM news
         WHERE is_duplicate = 0
-        ORDER BY importance DESC, published DESC
-    """)
-
-    rows = cursor.fetchall()
-
+          AND status IN ({ph})
+          AND importance IS NOT NULL
+          AND published_ts >= ? AND published_ts < ?
+        ORDER BY importance DESC, published_ts DESC
+        LIMIT ?
+    """, (*READY, start_ts, end_ts, MAX_NEWS_FOR_LLM)).fetchall()
     conn.close()
-
-    news_list = []
-    for row in rows:
-        (news_id, title, source, published, summary, category,
-        keywords, importance, url, status, is_duplicate) = row
-
-        if not published:
-            continue
-        try:
-            dt = datetime.fromisoformat(published)   # ✅ 改这里
-            news_date = dt.date().isoformat()
-        except Exception as e:
-            print(f"⚠️ 日期解析失败: id={news_id}, published={published}, error={e}")
-            continue
-    
-
-        # ----------------------------------
-        # 判断日期
-        # ----------------------------------
-
-        if news_date != report_date:
-            continue
-
-        # ----------------------------------
-        # 只要完成 LLM 分析即可
-        # ----------------------------------
-
-        if not summary:
-            continue
-
-        news_list.append({
-            "id": news_id,
-            "title": title,
-            "source": source,
-            "published": published,
-            "summary": summary,
-            "category": category,
-            "keywords": keywords,
-            "importance": importance,
-            "url": url,
-            "status": status
-        })
-
-    return news_list
+    return [{"id": r[0], "title": r[1], "source": r[2], "published": r[3],
+             "summary": r[4], "category": r[5], "keywords": r[6],
+             "importance": r[7], "url": r[8], "status": r[9]} for r in rows]
 
 
 # =========================================================
@@ -278,7 +255,7 @@ def generate_daily_report(news_list):
 # 根据新闻ID补充原始新闻信息
 # =========================================================
 
-def attach_news_info(report):
+def attach_news_info(report, valid_ids):
     """
     LLM只负责总结。
     新闻标题、来源、URL等从数据库获取。
@@ -287,52 +264,40 @@ def attach_news_info(report):
     """
 
     conn = get_db()
-    cursor = conn.cursor()
+    for event in report.get("events", []):
+        ids = []
+        for i in event.get("news_ids", []):
+            try:
+                i = int(i)
+            except (TypeError, ValueError):
+                continue
+            if i in valid_ids:
+                ids.append(i)
+        event["news_ids"] = ids
 
-    for event in report["events"]:
-
-        news_ids = event.get("news_ids", [])
-
-        if not news_ids:
+        if not ids:
             event["news"] = []
             continue
-
-        placeholders = ",".join(
-            ["?"] * len(news_ids)
-        )
-
-        cursor.execute(
-            f"""
-            SELECT
-                id,
-                title,
-                source,
-                published,
-                url
-            FROM news
-            WHERE id IN ({placeholders})
-            """,
-            news_ids
-        )
-
-        rows = cursor.fetchall()
-
-        event["news"] = []
-
-        for row in rows:
-            event["news"].append({
-                "id": row[0],
-                "title": row[1],
-                "source": row[2],
-                "published": row[3],
-                "url": row[4]
-            })
-
+        ph = ",".join("?" * len(ids))
+        rows = conn.execute(
+            f"SELECT id, title, source, published, url FROM news WHERE id IN ({ph})", ids
+        ).fetchall()
+        event["news"] = [
+            {"id": r[0], "title": r[1], "source": r[2], "published": r[3], "url": r[4]}
+            for r in rows
+        ]
     conn.close()
-
     return report
 
-
+def mark_reported(report):
+    ids = {i for e in report.get("events", []) for i in e.get("news_ids", [])}
+    if not ids:
+        return
+    conn = get_db()
+    ph = ",".join("?" * len(ids))
+    conn.execute(f"UPDATE news SET status='reported' WHERE id IN ({ph})", list(ids))
+    conn.commit()
+    conn.close()
 # =========================================================
 # 保存日报
 # =========================================================
@@ -379,35 +344,14 @@ def create_daily_report(report_date=None):
 
     init_daily_report_table()
 
-    # 1. 获取新闻
     news_list = get_news_by_date(report_date)
-    
-
-    print(f"获取到 {len(news_list)} 条新闻")
-
     if not news_list:
-        print("今天没有新闻")
         return None
-
-    # 控制发送给 LLM 的数量
-    news_list = news_list[:50]
-
-    # 2. LLM总结
     report = generate_daily_report(news_list)
-
-    # 3. 补充数据库中的真实URL
-    report = attach_news_info(report)
-
-    # 4. 保存
-    save_daily_report(
-        report_date,
-        report
-    )
-
-    print("日报生成完成")
-
+    report = attach_news_info(report, {n["id"] for n in news_list})
+    save_daily_report(report_date, report)
+    mark_reported(news_list)
     return report
-
 
 # =========================================================
 # 测试

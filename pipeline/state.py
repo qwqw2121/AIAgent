@@ -1,25 +1,44 @@
-'''⭐ 关键：共享状态的数据结构定义
- 记录"这一次运行"的执行情况——比如这次跑，clean 阶段处理了多少条、
- 报错了几条、要不要触发告警。它不需要装下所有文章数据，只需要装"运行时元信息"。
-'''
-
-# pipeline/state.py
+from datetime import datetime, timedelta, timezone
 from enum import Enum
-from pydantic import BaseModel
-from datetime import date
+from typing import Optional
+from pydantic import BaseModel, Field
+
 
 class NewsStatus(str, Enum):
     RAW = "raw"
     EXTRACTED = "extracted"
     EXTRACT_FAILED = "extract_failed"
+    DUPLICATE = "duplicate"
     DEDUPED = "deduped"
     ANALYZED = "analyzed"
     ANALYZE_FAILED = "analyze_failed"
     EMBEDDED = "embedded"
+    EMBED_FAILED = "embed_failed"
     CLUSTERED = "clustered"
     REPORTED = "reported"
 
+
+class CrawlMode(str, Enum):
+    MONTH = "month"      # 按月抓取(初始化/补漏)
+    RECENT = "recent"    # 最近 N 天(日常定时)
+
+
 class PipelineState(BaseModel):
-    run_date: date
-    stage_stats: dict[str, dict] = {}
-    errors: list[str] = []
+    # ---- 抓取参数 ----
+    mode: CrawlMode = CrawlMode.RECENT
+    year: Optional[int] = None
+    month: Optional[int] = None
+    lookback_days: int = 3
+
+    # ---- 成本控制 ----
+    max_analyze: int = 150        # 每次运行最多送 LLM 分析多少条
+    per_source_cap: int = 30      # 单个来源每次最多分析多少条(防 arXiv 刷屏)
+    max_report_days: int = 10     # 每次最多更新多少个日期的日报
+
+    # ---- 运行信息 ----
+    run_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    stage_stats: dict[str, dict] = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+
+    def since_ts(self) -> int:
+        return int((self.run_at - timedelta(days=self.lookback_days)).timestamp())
