@@ -2,6 +2,11 @@
 import sys
 import json
 from pathlib import Path
+# 添加项目根目录到 sys.path（而不是 backend 目录）
+ROOT_DIR = Path(__file__).parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from datetime import date, datetime
 from contextlib import closing, asynccontextmanager
 from typing import Optional
@@ -9,10 +14,7 @@ import sqlite3
 from backend.deps import get_db
 import uuid
 
-# 添加项目根目录到 sys.path（而不是 backend 目录）
-ROOT_DIR = Path(__file__).parent.parent
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -228,12 +230,14 @@ async def chat(req: AskRequest):
 #     否则 /today 会被 {report_date} 抢先匹配，报 "日期格式错误"。
 # ============================================================
 
-# 1. 静态：今天的日报
+from datetime import datetime, timezone, timedelta
+
 @app.get("/api/daily-report/today")
 def get_today_daily_report(conn=Depends(get_db)):
-    row = fetch_report_by_date(conn, date.today().isoformat())
+    d = datetime.now(timezone.utc).date().isoformat()
+    row = fetch_report_by_date(conn, d)
     if not row:
-        raise HTTPException(status_code=404, detail="今日日报尚未生成")
+        raise HTTPException(404, "今日日报尚未生成")
     return report_response(conn, row)
 
 @app.get("/api/daily-report/latest")

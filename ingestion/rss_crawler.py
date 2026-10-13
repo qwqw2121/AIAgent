@@ -11,8 +11,9 @@ from pathlib import Path
 import feedparser
 import requests
 import yaml
+from storage.db import get_connection
 
-DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
+# DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; ai-news-agent/1.0)"}
 CONNECT_TIMEOUT = 5     # 连接超时(秒)
@@ -21,7 +22,7 @@ FETCH_WORKERS = 8       # 并发拉取 RSS 的线程数(只做网络请求)
 
 
 def init_db():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
+    conn = get_connection()     
     conn.execute("""
     CREATE TABLE IF NOT EXISTS news (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -73,16 +74,18 @@ def normalize_category(category):
         return ",".join(category)
     return category or ""
 
+# ingestion/rss_crawler.py
+from pipeline.utils import day_bounds_ts
 
 def match_target(entry, target_year, target_month, target_date=None):
-    """时间过滤:指定 target_date 时按天过滤,否则按年月过滤(UTC)"""
     parsed = entry.get("published_parsed")
     if not parsed:
         return False, None
-    ts = calendar.timegm(parsed)
-    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+    ts = calendar.timegm(parsed)               # published_parsed 本身是 UTC
     if target_date is not None:
-        return dt.date() == target_date, ts
+        s, e = day_bounds_ts(target_date.isoformat())
+        return s <= ts < e, ts
+    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
     return (dt.year == target_year and dt.month == target_month), ts
 
 
@@ -155,7 +158,7 @@ def run(target_year: int = None, target_month: int = None, target_date: date = N
 
     config = load_sources()
     sources = config["sources"]
-    conn = init_db()
+    conn = get_connection()          # 原来是 init_db()
 
     total_fetched = total_inserted = total_skipped = 0
     per_source_stats, failed_sources = [], []

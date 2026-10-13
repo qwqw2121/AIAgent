@@ -196,7 +196,6 @@ def _extract_one(news_id, url):
 def run(start_ts=None, end_ts=None, limit=DEFAULT_LIMIT):
     conn = get_connection()
     try:
-        ensure_columns(conn)
 
         sql = """SELECT id, url FROM news
                  WHERE content IS NULL

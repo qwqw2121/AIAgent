@@ -7,7 +7,14 @@ from pipeline.state import PipelineState
 @task(name="llm-analysis", retries=1, retry_delay_seconds=30, timeout_seconds=3600)
 def analysis_task(state: PipelineState) -> PipelineState:
     logger = get_run_logger()
-    stats = analyze_run(max_items=state.max_analyze, per_source_cap=state.per_source_cap)
+    start_ts, end_ts = state.day_range_ts()
+    stats = analyze_run(
+    max_items=state.max_analyze,
+    per_source_cap=state.per_source_cap,
+    start_ts=start_ts,
+    end_ts=end_ts,
+)
+    # stats = analyze_run(max_items=state.max_analyze, per_source_cap=state.per_source_cap)
     state.stage_stats["analysis"] = stats
     logger.info(f"LLM分析: 成功{stats['success']} 失败{stats['failed']}")
     if stats["total"] and stats["failed"] / stats["total"] > 0.3:

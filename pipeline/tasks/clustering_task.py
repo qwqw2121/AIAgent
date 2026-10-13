@@ -2,12 +2,11 @@
 from prefect import task, get_run_logger
 from embedding.incremental_event import run as incremental_cluster_run
 from pipeline.state import PipelineState
-from pipeline.utils import day_bounds_ts
 
 @task(name="incremental-clustering", retries=1)
 def clustering_task(state: PipelineState) -> PipelineState:
     logger = get_run_logger()
-    start_ts, end_ts = day_bounds_ts(state.run_date)
+    start_ts, end_ts = state.day_range_ts()
     stats = incremental_cluster_run(start_ts, end_ts)
 
     state.stage_stats["clustering"] = stats

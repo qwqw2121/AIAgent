@@ -17,18 +17,23 @@ from datetime import datetime, date
 from pathlib import Path
 from dotenv import load_dotenv
 from openai import OpenAI
+from storage.db import get_connection
+from pipeline.utils import day_bounds_ts, SQL_TZ
 
 load_dotenv()
 
 # =========================================================
 # 配置
 # =========================================================
+get_db = get_connection        # 其余调用点不用改
 
+READY = ("clustered", "reported")
+MAX_NEWS_FOR_LLM = 50
 
 # 设置路径
-# DB_PATH = Path("storage/news.db") #绝对路径
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "storage/news.db"
+# # DB_PATH = Path("storage/news.db") #绝对路径
+# BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"
 
 # 使用 OpenAI 或 OpenAI-compatible API
 API_KEY = os.getenv(
@@ -51,9 +56,6 @@ client = OpenAI(
 # =========================================================
 # 数据库
 # =========================================================
-
-def get_db():
-    return sqlite3.connect(DB_PATH)
 
 
 def init_daily_report_table():
@@ -330,27 +332,42 @@ def save_daily_report(report_date, report):
     conn.commit()
     conn.close()
 
-
 # =========================================================
 # 生成完整日报
 # =========================================================
 
-def create_daily_report(report_date=None):
+def mark_reported(report_date):
+    """日报生成成功后，该日所有已走完流程的新闻都标记为 reported"""
+    start_ts, end_ts = day_bounds_ts(report_date)
+    conn = get_db()
+    try:
+        conn.execute("""
+            UPDATE news SET status='reported'
+            WHERE status='clustered' AND is_duplicate=0
+              AND published_ts >= ? AND published_ts < ?
+        """, (start_ts, end_ts))
+        conn.commit()
+    finally:
+        conn.close()
 
+
+def create_daily_report(report_date=None):
     if report_date is None:
         report_date = date.today().isoformat()
+    elif isinstance(report_date, date):
+        report_date = report_date.isoformat()
 
     print(f"开始生成 {report_date} 的日报...")
-
     init_daily_report_table()
 
     news_list = get_news_by_date(report_date)
     if not news_list:
         return None
+
     report = generate_daily_report(news_list)
     report = attach_news_info(report, {n["id"] for n in news_list})
     save_daily_report(report_date, report)
-    mark_reported(news_list)
+    mark_reported(report_date)          # 原来传的是 news_list，会报错
     return report
 
 # =========================================================

@@ -6,7 +6,6 @@
 import json
 import os
 import time
-import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Sequence, Union
 
@@ -26,8 +25,8 @@ from dotenv import load_dotenv
 
 
 # 设置路径
-BASE_DIR = Path(__file__).parent.parent
-DB_PATH = BASE_DIR / "storage/news.db"
+# BASE_DIR = Path(__file__).parent.parent
+# DB_PATH = BASE_DIR / "storage/news.db"
 
 load_dotenv()
 
@@ -169,7 +168,7 @@ def fetch_pending(conn, max_items, per_source_cap):
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
-def run(max_items=150, per_source_cap=30, max_retry=2):
+def run(max_items=150, per_source_cap=30, max_retry=2, start_ts=None, end_ts=None):
     conn = get_connection()
     try:
         rows = fetch_pending(conn, max_items, per_source_cap)

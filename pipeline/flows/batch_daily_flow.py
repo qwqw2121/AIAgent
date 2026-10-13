@@ -243,9 +243,9 @@ def batch_daily_flow(
 if __name__ == "__main__":
 
     batch_daily_flow(
-        start_date=date(2026, 9, 17),
-        end_date=date(2026, 9, 20),
+        start_date=date(2026, 10, 6),
+        end_date=date(2026, 10, 7),
 
         # 建议先从 2 开始
-        max_concurrency=1,
+        max_concurrency=2,
     )

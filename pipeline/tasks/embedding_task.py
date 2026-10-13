@@ -7,7 +7,9 @@ from pipeline.state import PipelineState
 @task(name="embedding", retries=1, retry_delay_seconds=30, timeout_seconds=3600)
 def embedding_task(state: PipelineState) -> PipelineState:
     logger = get_run_logger()
-    stats = embed_run()
+    # stats = embed_run()
+    start_ts, end_ts = state.day_range_ts()
+    stats = embed_run(start_ts, end_ts)
     state.stage_stats["embedding"] = stats
     logger.info(f"向量化: 成功{stats['success']} 失败{stats['failed']}")
     if stats.get("error"):

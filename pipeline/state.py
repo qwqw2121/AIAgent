@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field
-
+from pydantic import BaseModel, ConfigDict
+from pipeline.utils import day_bounds_ts
 
 class NewsStatus(str, Enum):
     RAW = "raw"
@@ -24,21 +25,23 @@ class CrawlMode(str, Enum):
 
 
 class PipelineState(BaseModel):
-    # ---- 抓取参数 ----
-    mode: CrawlMode = CrawlMode.RECENT
-    year: Optional[int] = None
-    month: Optional[int] = None
-    lookback_days: int = 3
+    model_config = ConfigDict(extra="forbid", validate_assignment=True)
+
+    # ---- 唯一的业务输入 ----
+    run_date: date                                   # 必填，UTC 自然日
 
     # ---- 成本控制 ----
-    max_analyze: int = 150        # 每次运行最多送 LLM 分析多少条
-    per_source_cap: int = 30      # 单个来源每次最多分析多少条(防 arXiv 刷屏)
-    max_report_days: int = 10     # 每次最多更新多少个日期的日报
+    max_analyze: int = 150
+    per_source_cap: int = 30
 
-    # ---- 运行信息 ----
-    run_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    # ---- 运行信息（只记录，不参与任何业务逻辑）----
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     stage_stats: dict[str, dict] = Field(default_factory=dict)
     errors: list[str] = Field(default_factory=list)
 
-    def since_ts(self) -> int:
-        return int((self.run_at - timedelta(days=self.lookback_days)).timestamp())
+    @property
+    def day(self) -> str:
+        return self.run_date.isoformat()
+
+    def day_range_ts(self) -> tuple[int, int]:
+        return day_bounds_ts(self.day)

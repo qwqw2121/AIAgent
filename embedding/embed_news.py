@@ -5,11 +5,11 @@ import sqlite3
 import json
 import time
 from pathlib import Path
-
+from storage.db import get_connection, update_fields
 # =====================================================
 # 1. 全局配置
 # =====================================================
-DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
+# DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
 
 # 🌟 核心开关：'online' (在线API) 或 'local' (本地BGE-M3)
 EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "online").lower() 
@@ -123,25 +123,15 @@ def build_embedding_text(row):
     # 🚨 确保绝不返回空字符串
     return text if text else "无有效内容"
 
-def load_news():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    conn.row_factory = sqlite3.Row
-    rows = conn.execute("""
+def load_news(conn, start_ts, end_ts):
+    return conn.execute("""
         SELECT id, title, summary, llm_category, keywords, source, category, published
         FROM news
         WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
+          AND published_ts >= ? AND published_ts < ?
         ORDER BY id
-    """).fetchall()
-    conn.close()
-    return rows
+    """, (start_ts, end_ts)).fetchall()
 
-def update_status(news_id, status):
-    """更新新闻状态"""
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute("UPDATE news SET status = ? WHERE id = ?", (status, news_id))
-    conn.commit()
-    conn.close()
 
 # =====================================================
 # 6. 测试与主流程
@@ -163,71 +153,74 @@ def test_embedding():
         print(f"   ❌ 测试失败")
         return False
 
+def load_news(conn, start_ts, end_ts):
+    return conn.execute("""
+        SELECT id, title, summary, llm_category, keywords, source, category, published
+        FROM news
+        WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
+          AND published_ts >= ? AND published_ts < ?
+        ORDER BY id
+    """, (start_ts, end_ts)).fetchall()
+
+
+# 整个 update_status 函数删掉
+
+
 def run(start_ts, end_ts):
-    """主流程：生成所有新闻的向量"""
     if not test_embedding():
         print("❌ Embedding 测试失败，请检查配置")
         return {"total": 0, "success": 0, "failed": 0, "error": "embedding test failed"}
-    
-    news_list = load_news()
-    print(f"\n📊 待向量化新闻：{len(news_list)} 条")
-    
-    success_count = 0
-    fail_count = 0
-    
-    for i, row in enumerate(news_list, 1):
-        news_id = row["id"]
-        print(f"\n[{i}/{len(news_list)}] 处理 ID={news_id}")
 
-        news_list = load_news(start_ts, end_ts)
+    conn = get_connection(row_factory=True)
+    try:
+        news_list = load_news(conn, start_ts, end_ts)
+        print(f"\n📊 待向量化新闻：{len(news_list)} 条")
 
-        try:
-            # 1. 构造文本
-            embedding_text = build_embedding_text(row)
-            if not embedding_text.strip():
-                print(f"  ⚠️ 跳过: 没有可 Embedding 的内容")
-                continue
-            
-            # 2. 生成向量
-            embedding = get_embedding(embedding_text)
-            if embedding is None:
+        success_count = fail_count = 0
+
+        for i, row in enumerate(news_list, 1):
+            news_id = row["id"]
+            print(f"[{i}/{len(news_list)}] 处理 ID={news_id}")
+            try:
+                embedding_text = build_embedding_text(row)
+                embedding = get_embedding(embedding_text)
+
+                if embedding is None:
+                    update_fields(conn, news_id, {"status": "embed_failed"})
+                    fail_count += 1
+                    continue
+
+                vector_store.add_news(
+                    news_id=news_id,
+                    embedding=embedding,
+                    embedding_text=embedding_text,
+                    metadata={
+                        "news_id": news_id,
+                        "title": row["title"] or "",
+                        "source": row["source"] or "",
+                        "category": row["category"] or "",
+                        "published_at": row["published"] or "",
+                    },
+                )
+                update_fields(conn, news_id, {"status": "embedded"})
+                success_count += 1
+
+            except Exception as e:
                 fail_count += 1
-                continue
-            
-            # 3. 存入向量数据库
-            vector_store.add_news(
-                news_id=news_id,
-                embedding=embedding,
-                embedding_text=embedding_text,
-                metadata={
-                    "news_id": news_id,
-                    "title": row["title"] or "",
-                    "source": row["source"] or "",
-                    "category": row["category"] or "",
-                    "published_at": row["published"] or "",
-                }
-            )
-            
-            # 4. 更新状态
-            update_status(news_id, "embedded")
-            success_count += 1
-            print(f"  ✅ 完成")
-            
-        except Exception as e:
-            fail_count += 1
-            print(f"  ❌ 失败: {e}")
-            import traceback
-            traceback.print_exc()
-            
-        # 🌟 优化：在线 API 不需要 sleep，本地模型 CPU 跑本身就有延迟
-        # 如果担心在线 API 限流，可以取消注释下面这行
-        # time.sleep(0.1) 
-    
-    print(f"\n{'='*60}")
-    print(f"📊 Embedding 任务完成")
-    print(f"  ✅ 成功: {success_count} 条")
-    print(f"  ❌ 失败: {fail_count} 条")
-    return {"total": len(news_list), "success": success_count, "failed": fail_count}
+                print(f"  ❌ 失败: {e}")
+                import traceback
+                traceback.print_exc()
+                update_fields(conn, news_id, {"status": "embed_failed"})
+
+        print(f"\n{'=' * 60}")
+        print(f"📊 Embedding 完成: 成功 {success_count}, 失败 {fail_count}")
+        return {"total": len(news_list), "success": success_count, "failed": fail_count}
+    finally:
+        conn.close()
+
 
 if __name__ == "__main__":
-    run()
+    from pipeline.utils import day_bounds_ts
+    from datetime import date, timedelta
+    s, e = day_bounds_ts((date.today() - timedelta(days=1)).isoformat())
+    print(run(s, e))

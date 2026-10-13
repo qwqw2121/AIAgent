@@ -119,31 +119,32 @@ def mark_deduped(conn, start_ts, end_ts):
 
 
 from pipeline.utils import day_bounds_ts, SQL_TZ
+from storage.db import get_connection
+def run(start_ts=None, end_ts=None):
+    conn = get_connection()          # 原来是 init_db()
 
-def run():
-    conn = sqlite3.connect(DB_PATH, timeout=30)
-    ensure_columns(conn)
-
-    days = [r[0] for r in conn.execute(f"""
-        SELECT DISTINCT date(published_ts,'unixepoch','{SQL_TZ}')
-        FROM news
-        WHERE status='extracted' AND published_ts IS NOT NULL
-        ORDER BY 1
-    """)]
+    if start_ts is not None:
+        windows = [(start_ts, end_ts)]          # 只处理指定窗口
+    else:
+        days = [r[0] for r in conn.execute(f"""
+            SELECT DISTINCT date(published_ts,'unixepoch','{SQL_TZ}')
+            FROM news
+            WHERE status='extracted' AND published_ts IS NOT NULL
+            ORDER BY 1
+        """)]
+        windows = [day_bounds_ts(d) for d in days]
 
     exact = fuzzy = survived = 0
-    for day in days:
-        s, e = day_bounds_ts(day)
+    for s, e in windows:
         exact += dedup_exact(conn, s, e)
         fuzzy += dedup_fuzzy(conn, s, e)
         survived += mark_deduped(conn, s, e)
 
-    # 没有发布时间的数据直接放行,避免永远卡在 extracted
-    conn.execute("UPDATE news SET status='deduped' WHERE status='extracted' AND published_ts IS NULL")
-    conn.commit()
+    if start_ts is None:    # 只在全量模式下放行无发布时间的数据
+        conn.execute("UPDATE news SET status='deduped' WHERE status='extracted' AND published_ts IS NULL")
+        conn.commit()
     conn.close()
-    return {"days": len(days), "exact_dup": exact, "fuzzy_dup": fuzzy, "survived": survived}
-
+    return {"days": len(windows), "exact_dup": exact, "fuzzy_dup": fuzzy, "survived": survived}
 
 if __name__ == "__main__":
     run()
