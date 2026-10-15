@@ -1,0 +1,1465 @@
+{
+  "agent": {
+    "n_cases": 30,
+    "repeat": 3,
+    "attempt_pass_rate": 0.23333333333333334,
+    "case_all_pass": "6/30",
+    "case_all_pass_ci95": [
+      0.095,
+      0.373
+    ],
+    "completion_rate": 0.2777777777777778,
+    "tool_call_success_rate": 1.0,
+    "latency_avg": 36.21813738440003,
+    "latency_p50": 32.327251274000446,
+    "latency_p95": 66.8962717329996,
+    "by_category": {
+      "semantic": "12/12",
+      "boundary": "0/3",
+      "date_search": "9/18",
+      "report_read": "0/15",
+      "report_generate": "0/12",
+      "force": "0/6",
+      "no_result": "0/9",
+      "no_tool": "0/9",
+      "multi_turn": "0/6"
+    },
+    "latency_avg_by_category": {
+      "semantic": 28.8,
+      "boundary": 47.5,
+      "date_search": 41.8
+    }
+  },
+  "rows": [
+    {
+      "q": "最近有哪些大模型发布的新闻？",
+      "latency": 39.95863108799995,
+      "error": null,
+      "called": [
+        "search_news_semantic",
+        "search_news_semantic"
+      ],
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "AI 芯片行业最近有什么动态？",
+      "latency": 42.64724352200005,
+      "error": null,
+      "called": [
+        "search_news_semantic",
+        "search_news_semantic",
+        "search_news_semantic",
+        "search_news_semantic",
+        "search_news_semantic",
+        "search_news_semantic"
+      ],
+      "tool_total": 6,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "量子计算有什么新进展？",
+      "latency": 18.55764741200005,
+      "error": null,
+      "called": [
+        "search_news_semantic"
+      ],
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "OpenAI 最近发布了什么？",
+      "latency": 17.14759850700011,
+      "error": null,
+      "called": [
+        "search_news_semantic"
+      ],
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "今天的大模型新闻有哪些？",
+      "latency": 42.85605169400014,
+      "error": null,
+      "called": [
+        "search_news_semantic",
+        "get_daily_report",
+        "request_daily_report"
+      ],
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "帮我总结一下 2026-10-08 的新闻",
+      "latency": 16.8283912710001,
+      "error": null,
+      "called": [
+        "get_daily_report"
+      ],
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": null,
+      "tool_ok": true
+    },
+    {
+      "q": "把 2026-10-08 的新闻整理成简报",
+      "latency": 12.879170643999942,
+      "error": null,
+      "called": [
+        "get_daily_report"
+      ],
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": null,
+      "tool_ok": true
+    },
+    {
+      "q": "先看 2026-10-08 的日报，再查一下 AI 芯片的最新进展",
+      "latency": 19.698891183999876,
+      "error": null,
+      "called": [
+        "get_daily_report",
+        "search_news_semantic"
+      ],
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true,
+      "tool_ok": true
+    },
+    {
+      "q": "你好，你能做什么？",
+      "latency": 9.593678252000018,
+      "error": null,
+      "called": [],
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null,
+      "tool_ok": true
+    }
+  ],
+  "retrieval": {
+    "n": 4,
+    "top5_hit_rate": 1.0,
+    "mrr": 1.0
+  },
+  "load": {
+    "concurrency": 5,
+    "total": 20,
+    "success_rate": 1.0,
+    "p50": 24.611870937000276,
+    "p95": 46.22065901299993,
+    "throughput_qps": 0.18407132150964423
+  },
+  "event_accuracy": {
+    "n": 70,
+    "correct": 64,
+    "acc": 0.9142857142857143,
+    "ci95": [
+      0.825341230221722,
+      0.9601238734596715
+    ]
+  },
+  "attempts": [
+    {
+      "cat": "semantic",
+      "q": "最近有哪些大模型发布的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 30.052897366000252,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "最近有哪些大模型发布的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 29.108160607998798,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "最近有哪些大模型发布的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 34.779010788999585,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "AI 芯片行业最近有什么动态？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 26.541112107999652,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "semantic",
+      "q": "AI 芯片行业最近有什么动态？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 32.327251274000446,
+      "error": null,
+      "tool_total": 5,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "AI 芯片行业最近有什么动态？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 23.87554308899962,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "量子计算有什么新进展？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 40.38094742599969,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "semantic",
+      "q": "量子计算有什么新进展？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 30.906733562000227,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "semantic",
+      "q": "量子计算有什么新进展？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 39.38001821800026,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "OpenAI 最近发布了什么？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 14.793684488999133,
+      "error": null,
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "OpenAI 最近发布了什么？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news_semantic"
+      ],
+      "latency": 17.777600314000665,
+      "error": null,
+      "tool_total": 1,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "semantic",
+      "q": "OpenAI 最近发布了什么？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 25.176057357999525,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "boundary",
+      "q": "今天的大模型新闻有哪些？",
+      "ok": false,
+      "why": [
+        "调用了禁用工具 ['get_daily_report']"
+      ],
+      "called": [
+        "get_daily_report",
+        "search_news_semantic"
+      ],
+      "latency": 33.099072236998836,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "boundary",
+      "q": "今天的大模型新闻有哪些？",
+      "ok": false,
+      "why": [
+        "调用了禁用工具 ['get_daily_report', 'request_daily_report']"
+      ],
+      "called": [
+        "get_daily_report",
+        "request_daily_report",
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 50.68809480100026,
+      "error": null,
+      "tool_total": 5,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "boundary",
+      "q": "今天的大模型新闻有哪些？",
+      "ok": false,
+      "why": [
+        "调用了禁用工具 ['get_daily_report']"
+      ],
+      "called": [
+        "get_daily_report",
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 58.593775063000066,
+      "error": null,
+      "tool_total": 5,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "date_search",
+      "q": "查一下 2026-10-08 发布的 AI 芯片相关新闻",
+      "ok": true,
+      "why": [],
+      "called": [
+        "get_daily_report",
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 46.70971857600125,
+      "error": null,
+      "tool_total": 6,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "date_search",
+      "q": "查一下 2026-10-08 发布的 AI 芯片相关新闻",
+      "ok": false,
+      "why": [
+        "缺少工具 ['search_news_semantic']"
+      ],
+      "called": [
+        "get_daily_report",
+        "search_news"
+      ],
+      "latency": 26.828202175000115,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "查一下 2026-10-08 发布的 AI 芯片相关新闻",
+      "ok": true,
+      "why": [],
+      "called": [
+        "get_daily_report",
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 39.47163475600064,
+      "error": null,
+      "tool_total": 4,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "date_search",
+      "q": "2026 年 10 月 8 日有哪些关于 OpenAI 的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 17.582102787999247,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "date_search",
+      "q": "2026 年 10 月 8 日有哪些关于 OpenAI 的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 21.984301459000562,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "date_search",
+      "q": "2026 年 10 月 8 日有哪些关于 OpenAI 的新闻？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "get_daily_report",
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 32.82355182500032,
+      "error": null,
+      "tool_total": 3,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "date_search",
+      "q": "帮我检索 2026-10-08 到 2026-10-10 的大模型新闻",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 19.98799045600026,
+      "error": null,
+      "tool_total": 2,
+      "tool_fail": 0,
+      "cite_ok": true
+    },
+    {
+      "cat": "date_search",
+      "q": "帮我检索 2026-10-08 到 2026-10-10 的大模型新闻",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 89.60869239500062,
+      "error": null,
+      "tool_total": 8,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "date_search",
+      "q": "帮我检索 2026-10-08 到 2026-10-10 的大模型新闻",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 66.8962717329996,
+      "error": null,
+      "tool_total": 6,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "date_search",
+      "q": "截至 2026-10-08，DeepSeek 有哪些相关动态？",
+      "ok": true,
+      "why": [],
+      "called": [
+        "search_news",
+        "search_news_semantic"
+      ],
+      "latency": 56.08100974500121,
+      "error": null,
+      "tool_total": 4,
+      "tool_fail": 0,
+      "cite_ok": false
+    },
+    {
+      "cat": "date_search",
+      "q": "截至 2026-10-08，DeepSeek 有哪些相关动态？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-69b33811-c2ee-9555-b7fe-e16b3c6bd196', 'request_id': '69b33811-c2ee-9555-b7fe-e16b3c6bd196'}"
+      ],
+      "called": [],
+      "latency": 46.8033871109983,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-69b33811-c2ee-9555-b7fe-e16b3c6bd196', 'request_id': '69b33811-c2ee-9555-b7fe-e16b3c6bd196'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "截至 2026-10-08，DeepSeek 有哪些相关动态？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e73f6190-3848-9905-a464-e52ce1e1677f', 'request_id': 'e73f6190-3848-9905-a464-e52ce1e1677f'}"
+      ],
+      "called": [],
+      "latency": 0.05894320100014738,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e73f6190-3848-9905-a464-e52ce1e1677f', 'request_id': 'e73f6190-3848-9905-a464-e52ce1e1677f'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "找出 2026-10-08 那天有关 GPU 的报道，不要日报总结",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1b309fa5-f6bd-9093-9952-6742211d6591', 'request_id': '1b309fa5-f6bd-9093-9952-6742211d6591'}"
+      ],
+      "called": [],
+      "latency": 0.09085510099976091,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1b309fa5-f6bd-9093-9952-6742211d6591', 'request_id': '1b309fa5-f6bd-9093-9952-6742211d6591'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "找出 2026-10-08 那天有关 GPU 的报道，不要日报总结",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a933f174-e606-9173-86e3-71289a3e542b', 'request_id': 'a933f174-e606-9173-86e3-71289a3e542b'}"
+      ],
+      "called": [],
+      "latency": 0.0470891010008927,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a933f174-e606-9173-86e3-71289a3e542b', 'request_id': 'a933f174-e606-9173-86e3-71289a3e542b'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "找出 2026-10-08 那天有关 GPU 的报道，不要日报总结",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-d64ae342-5e77-990a-b79b-4c2ee632e5cb', 'request_id': 'd64ae342-5e77-990a-b79b-4c2ee632e5cb'}"
+      ],
+      "called": [],
+      "latency": 0.05959590000020398,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-d64ae342-5e77-990a-b79b-4c2ee632e5cb', 'request_id': 'd64ae342-5e77-990a-b79b-4c2ee632e5cb'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "2026-10-08 的新闻里，有没有关于多模态模型的内容？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ec72015a-8529-90ee-8cd3-331fbb6197ab', 'request_id': 'ec72015a-8529-90ee-8cd3-331fbb6197ab'}"
+      ],
+      "called": [],
+      "latency": 0.06041570100023819,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ec72015a-8529-90ee-8cd3-331fbb6197ab', 'request_id': 'ec72015a-8529-90ee-8cd3-331fbb6197ab'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "2026-10-08 的新闻里，有没有关于多模态模型的内容？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-eae3cbc6-1fe1-9329-998b-2e4219e6665d', 'request_id': 'eae3cbc6-1fe1-9329-998b-2e4219e6665d'}"
+      ],
+      "called": [],
+      "latency": 0.09041310100110422,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-eae3cbc6-1fe1-9329-998b-2e4219e6665d', 'request_id': 'eae3cbc6-1fe1-9329-998b-2e4219e6665d'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "date_search",
+      "q": "2026-10-08 的新闻里，有没有关于多模态模型的内容？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ac802bcc-e1f8-93a9-8576-569389247999', 'request_id': 'ac802bcc-e1f8-93a9-8576-569389247999'}"
+      ],
+      "called": [],
+      "latency": 0.0936941019990627,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ac802bcc-e1f8-93a9-8576-569389247999', 'request_id': 'ac802bcc-e1f8-93a9-8576-569389247999'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "帮我总结一下 2026-10-08 的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2f298185-97c2-94ff-b92e-58117191b81e', 'request_id': '2f298185-97c2-94ff-b92e-58117191b81e'}"
+      ],
+      "called": [],
+      "latency": 0.07719880100012233,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2f298185-97c2-94ff-b92e-58117191b81e', 'request_id': '2f298185-97c2-94ff-b92e-58117191b81e'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "帮我总结一下 2026-10-08 的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-76c43c4f-13bf-9a21-9697-851fc991d1f5', 'request_id': '76c43c4f-13bf-9a21-9697-851fc991d1f5'}"
+      ],
+      "called": [],
+      "latency": 0.08435130100042443,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-76c43c4f-13bf-9a21-9697-851fc991d1f5', 'request_id': '76c43c4f-13bf-9a21-9697-851fc991d1f5'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "帮我总结一下 2026-10-08 的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6c6dce4b-ae88-9ebe-8d90-e3e093a605f6', 'request_id': '6c6dce4b-ae88-9ebe-8d90-e3e093a605f6'}"
+      ],
+      "called": [],
+      "latency": 0.060549301000719424,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6c6dce4b-ae88-9ebe-8d90-e3e093a605f6', 'request_id': '6c6dce4b-ae88-9ebe-8d90-e3e093a605f6'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "把 2026-10-08 的新闻整理成简报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6ca110dd-d8d5-94bd-9d4f-dea129e4d72e', 'request_id': '6ca110dd-d8d5-94bd-9d4f-dea129e4d72e'}"
+      ],
+      "called": [],
+      "latency": 0.08350270099981572,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6ca110dd-d8d5-94bd-9d4f-dea129e4d72e', 'request_id': '6ca110dd-d8d5-94bd-9d4f-dea129e4d72e'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "把 2026-10-08 的新闻整理成简报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1e8c349e-174b-9d6a-a0b6-2865b2b741bd', 'request_id': '1e8c349e-174b-9d6a-a0b6-2865b2b741bd'}"
+      ],
+      "called": [],
+      "latency": 0.05773559999943245,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1e8c349e-174b-9d6a-a0b6-2865b2b741bd', 'request_id': '1e8c349e-174b-9d6a-a0b6-2865b2b741bd'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "把 2026-10-08 的新闻整理成简报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1160fb61-08e5-92e4-981a-5be01c8047a4', 'request_id': '1160fb61-08e5-92e4-981a-5be01c8047a4'}"
+      ],
+      "called": [],
+      "latency": 0.062475401000483544,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1160fb61-08e5-92e4-981a-5be01c8047a4', 'request_id': '1160fb61-08e5-92e4-981a-5be01c8047a4'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "读取 2026-10-08 的日报，列出最重要的三条",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-37e7c3c4-bcdc-9557-9899-35e5a46044e1', 'request_id': '37e7c3c4-bcdc-9557-9899-35e5a46044e1'}"
+      ],
+      "called": [],
+      "latency": 0.05978820100062876,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-37e7c3c4-bcdc-9557-9899-35e5a46044e1', 'request_id': '37e7c3c4-bcdc-9557-9899-35e5a46044e1'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "读取 2026-10-08 的日报，列出最重要的三条",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ef36dc62-fb4c-9865-b9bc-47ad39ff0952', 'request_id': 'ef36dc62-fb4c-9865-b9bc-47ad39ff0952'}"
+      ],
+      "called": [],
+      "latency": 0.05841230099940731,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ef36dc62-fb4c-9865-b9bc-47ad39ff0952', 'request_id': 'ef36dc62-fb4c-9865-b9bc-47ad39ff0952'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "读取 2026-10-08 的日报，列出最重要的三条",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-5b97d0a3-2e05-9f53-af1d-83c73d896c98', 'request_id': '5b97d0a3-2e05-9f53-af1d-83c73d896c98'}"
+      ],
+      "called": [],
+      "latency": 0.060527200999786146,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-5b97d0a3-2e05-9f53-af1d-83c73d896c98', 'request_id': '5b97d0a3-2e05-9f53-af1d-83c73d896c98'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "先看 2026-10-08 的日报，再查一下 AI 芯片的最新进展",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b772d043-0670-9aca-8eda-8f483d8afa9b', 'request_id': 'b772d043-0670-9aca-8eda-8f483d8afa9b'}"
+      ],
+      "called": [],
+      "latency": 0.06882340099946305,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b772d043-0670-9aca-8eda-8f483d8afa9b', 'request_id': 'b772d043-0670-9aca-8eda-8f483d8afa9b'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "先看 2026-10-08 的日报，再查一下 AI 芯片的最新进展",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0a08caa4-3749-9b63-bb98-3a6a3bb7c073', 'request_id': '0a08caa4-3749-9b63-bb98-3a6a3bb7c073'}"
+      ],
+      "called": [],
+      "latency": 0.0647659999995085,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0a08caa4-3749-9b63-bb98-3a6a3bb7c073', 'request_id': '0a08caa4-3749-9b63-bb98-3a6a3bb7c073'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "先看 2026-10-08 的日报，再查一下 AI 芯片的最新进展",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4db0be13-ac55-9113-8880-36af33a52c6b', 'request_id': '4db0be13-ac55-9113-8880-36af33a52c6b'}"
+      ],
+      "called": [],
+      "latency": 0.05991690100017877,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4db0be13-ac55-9113-8880-36af33a52c6b', 'request_id': '4db0be13-ac55-9113-8880-36af33a52c6b'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "请读取 2026-10-08 已经生成的日报，不要重新生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c1deed11-b1a5-95c6-874d-e5b39d0f7add', 'request_id': 'c1deed11-b1a5-95c6-874d-e5b39d0f7add'}"
+      ],
+      "called": [],
+      "latency": 0.0822167009991972,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c1deed11-b1a5-95c6-874d-e5b39d0f7add', 'request_id': 'c1deed11-b1a5-95c6-874d-e5b39d0f7add'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "请读取 2026-10-08 已经生成的日报，不要重新生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a85dba29-9b8d-9962-ab96-44304d905965', 'request_id': 'a85dba29-9b8d-9962-ab96-44304d905965'}"
+      ],
+      "called": [],
+      "latency": 0.08606000100007805,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a85dba29-9b8d-9962-ab96-44304d905965', 'request_id': 'a85dba29-9b8d-9962-ab96-44304d905965'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_read",
+      "q": "请读取 2026-10-08 已经生成的日报，不要重新生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e9d7f543-8a6b-9b41-9595-0ecad25cc6d9', 'request_id': 'e9d7f543-8a6b-9b41-9595-0ecad25cc6d9'}"
+      ],
+      "called": [],
+      "latency": 0.05364740100048948,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e9d7f543-8a6b-9b41-9595-0ecad25cc6d9', 'request_id': 'e9d7f543-8a6b-9b41-9595-0ecad25cc6d9'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "请生成 2099-01-01 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1655f9c4-d1f7-92ed-b692-9f2d244efbe7', 'request_id': '1655f9c4-d1f7-92ed-b692-9f2d244efbe7'}"
+      ],
+      "called": [],
+      "latency": 0.0795795009998983,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1655f9c4-d1f7-92ed-b692-9f2d244efbe7', 'request_id': '1655f9c4-d1f7-92ed-b692-9f2d244efbe7'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "请生成 2099-01-01 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2c553f5b-0aa8-9a41-82ad-f563adf86823', 'request_id': '2c553f5b-0aa8-9a41-82ad-f563adf86823'}"
+      ],
+      "called": [],
+      "latency": 0.07811870099976659,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2c553f5b-0aa8-9a41-82ad-f563adf86823', 'request_id': '2c553f5b-0aa8-9a41-82ad-f563adf86823'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "请生成 2099-01-01 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e75d47da-00c2-95ba-9472-6668b3c1b318', 'request_id': 'e75d47da-00c2-95ba-9472-6668b3c1b318'}"
+      ],
+      "called": [],
+      "latency": 0.05943560100058676,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e75d47da-00c2-95ba-9472-6668b3c1b318', 'request_id': 'e75d47da-00c2-95ba-9472-6668b3c1b318'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "我需要 2099-01-01 的 AI 新闻简报，如果还没有就发起生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-d463a33d-470c-90a4-b0d4-5cfec0ba3262', 'request_id': 'd463a33d-470c-90a4-b0d4-5cfec0ba3262'}"
+      ],
+      "called": [],
+      "latency": 0.07868270099970687,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-d463a33d-470c-90a4-b0d4-5cfec0ba3262', 'request_id': 'd463a33d-470c-90a4-b0d4-5cfec0ba3262'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "我需要 2099-01-01 的 AI 新闻简报，如果还没有就发起生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0fc40034-46ab-978f-95fd-a35a168ab25a', 'request_id': '0fc40034-46ab-978f-95fd-a35a168ab25a'}"
+      ],
+      "called": [],
+      "latency": 0.08671780099939497,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0fc40034-46ab-978f-95fd-a35a168ab25a', 'request_id': '0fc40034-46ab-978f-95fd-a35a168ab25a'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "我需要 2099-01-01 的 AI 新闻简报，如果还没有就发起生成",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-127b054e-1cc2-9fb8-baeb-00c2725bcfb0', 'request_id': '127b054e-1cc2-9fb8-baeb-00c2725bcfb0'}"
+      ],
+      "called": [],
+      "latency": 0.06202670099992247,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-127b054e-1cc2-9fb8-baeb-00c2725bcfb0', 'request_id': '127b054e-1cc2-9fb8-baeb-00c2725bcfb0'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "2099-01-01 的日报有吗？没有的话请生成一份",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-76ad767c-f782-9ae4-b943-a6cd53bae05c', 'request_id': '76ad767c-f782-9ae4-b943-a6cd53bae05c'}"
+      ],
+      "called": [],
+      "latency": 0.08544260200142162,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-76ad767c-f782-9ae4-b943-a6cd53bae05c', 'request_id': '76ad767c-f782-9ae4-b943-a6cd53bae05c'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "2099-01-01 的日报有吗？没有的话请生成一份",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a5f61563-080f-999e-b33c-33858d154e1c', 'request_id': 'a5f61563-080f-999e-b33c-33858d154e1c'}"
+      ],
+      "called": [],
+      "latency": 0.05425070100136509,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a5f61563-080f-999e-b33c-33858d154e1c', 'request_id': 'a5f61563-080f-999e-b33c-33858d154e1c'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "2099-01-01 的日报有吗？没有的话请生成一份",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-42f8468e-73fd-947b-b45c-37a854425987', 'request_id': '42f8468e-73fd-947b-b45c-37a854425987'}"
+      ],
+      "called": [],
+      "latency": 0.06091310100055125,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-42f8468e-73fd-947b-b45c-37a854425987', 'request_id': '42f8468e-73fd-947b-b45c-37a854425987'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "检查 2099-01-01 的日报状态，缺失就创建",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-794c1504-0505-91f6-a558-41f9017bb9e0', 'request_id': '794c1504-0505-91f6-a558-41f9017bb9e0'}"
+      ],
+      "called": [],
+      "latency": 0.060534701000506175,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-794c1504-0505-91f6-a558-41f9017bb9e0', 'request_id': '794c1504-0505-91f6-a558-41f9017bb9e0'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "检查 2099-01-01 的日报状态，缺失就创建",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-f5759b56-57f3-99f1-8ae8-09fbfa6b3ae5', 'request_id': 'f5759b56-57f3-99f1-8ae8-09fbfa6b3ae5'}"
+      ],
+      "called": [],
+      "latency": 0.07687270200040075,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-f5759b56-57f3-99f1-8ae8-09fbfa6b3ae5', 'request_id': 'f5759b56-57f3-99f1-8ae8-09fbfa6b3ae5'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "report_generate",
+      "q": "检查 2099-01-01 的日报状态，缺失就创建",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-bddced05-0667-900b-829e-6af730a26047', 'request_id': 'bddced05-0667-900b-829e-6af730a26047'}"
+      ],
+      "called": [],
+      "latency": 0.07718510099948617,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-bddced05-0667-900b-829e-6af730a26047', 'request_id': 'bddced05-0667-900b-829e-6af730a26047'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "强制重新生成 2026-10-08 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a3cacebc-3438-97ee-a832-b2fcd152c378', 'request_id': 'a3cacebc-3438-97ee-a832-b2fcd152c378'}"
+      ],
+      "called": [],
+      "latency": 0.07752640200124006,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-a3cacebc-3438-97ee-a832-b2fcd152c378', 'request_id': 'a3cacebc-3438-97ee-a832-b2fcd152c378'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "强制重新生成 2026-10-08 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c609b282-17a4-94bf-a9b9-dc84e7b1e4fd', 'request_id': 'c609b282-17a4-94bf-a9b9-dc84e7b1e4fd'}"
+      ],
+      "called": [],
+      "latency": 0.08441160099937406,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c609b282-17a4-94bf-a9b9-dc84e7b1e4fd', 'request_id': 'c609b282-17a4-94bf-a9b9-dc84e7b1e4fd'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "强制重新生成 2026-10-08 的日报",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1961201c-7621-9fbb-956b-ffb261015653', 'request_id': '1961201c-7621-9fbb-956b-ffb261015653'}"
+      ],
+      "called": [],
+      "latency": 0.06009920199903718,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-1961201c-7621-9fbb-956b-ffb261015653', 'request_id': '1961201c-7621-9fbb-956b-ffb261015653'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "忽略已有的 2026-10-08 日报，重新生成一份最新版本",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b35fc301-de3a-9d30-8754-cfdff7e32e49', 'request_id': 'b35fc301-de3a-9d30-8754-cfdff7e32e49'}"
+      ],
+      "called": [],
+      "latency": 0.06315060099950642,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b35fc301-de3a-9d30-8754-cfdff7e32e49', 'request_id': 'b35fc301-de3a-9d30-8754-cfdff7e32e49'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "忽略已有的 2026-10-08 日报，重新生成一份最新版本",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0b977068-1fc4-9a45-8502-d6437938fbee', 'request_id': '0b977068-1fc4-9a45-8502-d6437938fbee'}"
+      ],
+      "called": [],
+      "latency": 0.07985060099963448,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-0b977068-1fc4-9a45-8502-d6437938fbee', 'request_id': '0b977068-1fc4-9a45-8502-d6437938fbee'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "force",
+      "q": "忽略已有的 2026-10-08 日报，重新生成一份最新版本",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-19883fcd-9d80-963e-a4b9-0af231990d8c', 'request_id': '19883fcd-9d80-963e-a4b9-0af231990d8c'}"
+      ],
+      "called": [],
+      "latency": 0.13352720300099463,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-19883fcd-9d80-963e-a4b9-0af231990d8c', 'request_id': '19883fcd-9d80-963e-a4b9-0af231990d8c'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "检索数据库中关于火星城市地下海洋 AI 监管政策的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-f628ba2e-7951-9a33-aac7-c7792d831700', 'request_id': 'f628ba2e-7951-9a33-aac7-c7792d831700'}"
+      ],
+      "called": [],
+      "latency": 0.08101970200004871,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-f628ba2e-7951-9a33-aac7-c7792d831700', 'request_id': 'f628ba2e-7951-9a33-aac7-c7792d831700'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "检索数据库中关于火星城市地下海洋 AI 监管政策的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2a26009d-ac1d-9698-a989-a7e506cfe81c', 'request_id': '2a26009d-ac1d-9698-a989-a7e506cfe81c'}"
+      ],
+      "called": [],
+      "latency": 0.059416600999611546,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-2a26009d-ac1d-9698-a989-a7e506cfe81c', 'request_id': '2a26009d-ac1d-9698-a989-a7e506cfe81c'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "检索数据库中关于火星城市地下海洋 AI 监管政策的新闻",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ca87fbd5-876e-9660-aa12-b21516255bcc', 'request_id': 'ca87fbd5-876e-9660-aa12-b21516255bcc'}"
+      ],
+      "called": [],
+      "latency": 0.05497680099870195,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-ca87fbd5-876e-9660-aa12-b21516255bcc', 'request_id': 'ca87fbd5-876e-9660-aa12-b21516255bcc'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "新闻库里有没有关于 2099 年月球宠物经济监管的报道？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-93aed728-9f9f-945b-bc73-532e38ed0b9e', 'request_id': '93aed728-9f9f-945b-bc73-532e38ed0b9e'}"
+      ],
+      "called": [],
+      "latency": 0.0825887020000664,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-93aed728-9f9f-945b-bc73-532e38ed0b9e', 'request_id': '93aed728-9f9f-945b-bc73-532e38ed0b9e'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "新闻库里有没有关于 2099 年月球宠物经济监管的报道？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-802e0b3f-f3ec-945c-b69f-61a9c07a85c8', 'request_id': '802e0b3f-f3ec-945c-b69f-61a9c07a85c8'}"
+      ],
+      "called": [],
+      "latency": 0.07579490100033581,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-802e0b3f-f3ec-945c-b69f-61a9c07a85c8', 'request_id': '802e0b3f-f3ec-945c-b69f-61a9c07a85c8'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "新闻库里有没有关于 2099 年月球宠物经济监管的报道？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-deadf8df-3cb8-9d37-b7ab-970fec3a5903', 'request_id': 'deadf8df-3cb8-9d37-b7ab-970fec3a5903'}"
+      ],
+      "called": [],
+      "latency": 0.07921550200080674,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-deadf8df-3cb8-9d37-b7ab-970fec3a5903', 'request_id': 'deadf8df-3cb8-9d37-b7ab-970fec3a5903'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "只根据新闻库回答：最近有哪些关于海底城市 AI 选举系统的新闻？如果没有请直说",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6234dae2-3755-996a-bec3-6a389363ee37', 'request_id': '6234dae2-3755-996a-bec3-6a389363ee37'}"
+      ],
+      "called": [],
+      "latency": 0.08127890099967772,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6234dae2-3755-996a-bec3-6a389363ee37', 'request_id': '6234dae2-3755-996a-bec3-6a389363ee37'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "只根据新闻库回答：最近有哪些关于海底城市 AI 选举系统的新闻？如果没有请直说",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c2511eef-904c-973c-867b-4e516804ed45', 'request_id': 'c2511eef-904c-973c-867b-4e516804ed45'}"
+      ],
+      "called": [],
+      "latency": 0.050303100999371964,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c2511eef-904c-973c-867b-4e516804ed45', 'request_id': 'c2511eef-904c-973c-867b-4e516804ed45'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_result",
+      "q": "只根据新闻库回答：最近有哪些关于海底城市 AI 选举系统的新闻？如果没有请直说",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-535f2140-3424-9e87-b485-8cb7e0ef2911', 'request_id': '535f2140-3424-9e87-b485-8cb7e0ef2911'}"
+      ],
+      "called": [],
+      "latency": 0.07310260200029006,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-535f2140-3424-9e87-b485-8cb7e0ef2911', 'request_id': '535f2140-3424-9e87-b485-8cb7e0ef2911'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "你好，你能做什么？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6d050867-1aff-9601-adf6-93fafc61ecef', 'request_id': '6d050867-1aff-9601-adf6-93fafc61ecef'}"
+      ],
+      "called": [],
+      "latency": 0.08555970100132981,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6d050867-1aff-9601-adf6-93fafc61ecef', 'request_id': '6d050867-1aff-9601-adf6-93fafc61ecef'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "你好，你能做什么？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-3bafaaf9-583c-966f-a203-db1b78c7db41', 'request_id': '3bafaaf9-583c-966f-a203-db1b78c7db41'}"
+      ],
+      "called": [],
+      "latency": 0.07492650200038042,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-3bafaaf9-583c-966f-a203-db1b78c7db41', 'request_id': '3bafaaf9-583c-966f-a203-db1b78c7db41'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "你好，你能做什么？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b4835c00-de34-9bc1-b7f5-6bfc78511c0f', 'request_id': 'b4835c00-de34-9bc1-b7f5-6bfc78511c0f'}"
+      ],
+      "called": [],
+      "latency": 0.06305060100021365,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-b4835c00-de34-9bc1-b7f5-6bfc78511c0f', 'request_id': 'b4835c00-de34-9bc1-b7f5-6bfc78511c0f'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "帮我写一首关于春天的短诗",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-63d64487-e2bf-9173-974d-8971e3e837b9', 'request_id': '63d64487-e2bf-9173-974d-8971e3e837b9'}"
+      ],
+      "called": [],
+      "latency": 0.08898680200036324,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-63d64487-e2bf-9173-974d-8971e3e837b9', 'request_id': '63d64487-e2bf-9173-974d-8971e3e837b9'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "帮我写一首关于春天的短诗",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-94f61283-d56f-966f-979a-5e68994afba4', 'request_id': '94f61283-d56f-966f-979a-5e68994afba4'}"
+      ],
+      "called": [],
+      "latency": 0.08231560099920898,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-94f61283-d56f-966f-979a-5e68994afba4', 'request_id': '94f61283-d56f-966f-979a-5e68994afba4'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "帮我写一首关于春天的短诗",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-eaa5d610-20af-902c-8925-2f50a6843659', 'request_id': 'eaa5d610-20af-902c-8925-2f50a6843659'}"
+      ],
+      "called": [],
+      "latency": 0.06934810199891217,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-eaa5d610-20af-902c-8925-2f50a6843659', 'request_id': 'eaa5d610-20af-902c-8925-2f50a6843659'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "1+1 等于几？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-82efdc29-5dfd-9fc3-ae7b-5f0a1963bf4d', 'request_id': '82efdc29-5dfd-9fc3-ae7b-5f0a1963bf4d'}"
+      ],
+      "called": [],
+      "latency": 0.07404870100072003,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-82efdc29-5dfd-9fc3-ae7b-5f0a1963bf4d', 'request_id': '82efdc29-5dfd-9fc3-ae7b-5f0a1963bf4d'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "1+1 等于几？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4390f0a1-5121-9d85-9713-cafffda14540', 'request_id': '4390f0a1-5121-9d85-9713-cafffda14540'}"
+      ],
+      "called": [],
+      "latency": 0.063511001999359,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4390f0a1-5121-9d85-9713-cafffda14540', 'request_id': '4390f0a1-5121-9d85-9713-cafffda14540'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "no_tool",
+      "q": "1+1 等于几？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c7d89302-88b8-9469-b0ed-f22e4386bd1b', 'request_id': 'c7d89302-88b8-9469-b0ed-f22e4386bd1b'}"
+      ],
+      "called": [],
+      "latency": 0.056806201000654255,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-c7d89302-88b8-9469-b0ed-f22e4386bd1b', 'request_id': 'c7d89302-88b8-9469-b0ed-f22e4386bd1b'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才说我关注什么主题？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e7ebc247-beac-92fe-b3ee-a2a9408b6aee', 'request_id': 'e7ebc247-beac-92fe-b3ee-a2a9408b6aee'}"
+      ],
+      "called": [],
+      "latency": 0.051703700999496505,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-e7ebc247-beac-92fe-b3ee-a2a9408b6aee', 'request_id': 'e7ebc247-beac-92fe-b3ee-a2a9408b6aee'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才说我关注什么主题？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-de8b8b9c-6701-9ae6-a43c-4c4097d9780a', 'request_id': 'de8b8b9c-6701-9ae6-a43c-4c4097d9780a'}"
+      ],
+      "called": [],
+      "latency": 0.06710730099985085,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-de8b8b9c-6701-9ae6-a43c-4c4097d9780a', 'request_id': 'de8b8b9c-6701-9ae6-a43c-4c4097d9780a'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才说我关注什么主题？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-9b73a233-739f-96a3-8e87-9bad6a8a0b95', 'request_id': '9b73a233-739f-96a3-8e87-9bad6a8a0b95'}"
+      ],
+      "called": [],
+      "latency": 0.0686963009993633,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-9b73a233-739f-96a3-8e87-9bad6a8a0b95', 'request_id': '9b73a233-739f-96a3-8e87-9bad6a8a0b95'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才提到的是哪一天？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6636f16b-4284-9baf-bcc8-359f277c4450', 'request_id': '6636f16b-4284-9baf-bcc8-359f277c4450'}"
+      ],
+      "called": [],
+      "latency": 0.07878570200045942,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-6636f16b-4284-9baf-bcc8-359f277c4450', 'request_id': '6636f16b-4284-9baf-bcc8-359f277c4450'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才提到的是哪一天？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4df41807-aada-9dca-b289-0aa0f13caf27', 'request_id': '4df41807-aada-9dca-b289-0aa0f13caf27'}"
+      ],
+      "called": [],
+      "latency": 0.08434350199968321,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-4df41807-aada-9dca-b289-0aa0f13caf27', 'request_id': '4df41807-aada-9dca-b289-0aa0f13caf27'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    },
+    {
+      "cat": "multi_turn",
+      "q": "我刚才提到的是哪一天？",
+      "ok": false,
+      "why": [
+        "执行异常: OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-77c6d0aa-78de-9a05-9749-4e7903cc949f', 'request_id': '77c6d0aa-78de-9a05-9749-4e7903cc949f'}"
+      ],
+      "called": [],
+      "latency": 0.060713601000315975,
+      "error": "OpenAIPermissionDeniedError: Error code: 403 - {'error': {'message': 'Free quota exhausted. To continue accessing the model on a paid basis, please add funds or disable the \"use free tier only\" mode in the management console.', 'type': 'AllocationQuota.FreeTierOnly', 'param': None, 'code': 'AllocationQuota.FreeTierOnly'}, 'id': 'chatcmpl-77c6d0aa-78de-9a05-9749-4e7903cc949f', 'request_id': '77c6d0aa-78de-9a05-9749-4e7903cc949f'}",
+      "tool_total": 0,
+      "tool_fail": 0,
+      "cite_ok": null
+    }
+  ]
+}

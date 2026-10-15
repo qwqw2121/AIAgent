@@ -1,6 +1,10 @@
 # agent/graph.py
 '''
 多 Agent + Supervisor 路由
+系统采用 “路由分发 + 专业节点执行 + 异步后台任务” 的三层架构：
+意图路由层 (Supervisor)：负责理解用户意图，提取关键实体（如日期），并将任务分发给正确的下游节点。
+业务执行层 (Agents/Nodes)：包含知识问答 (RAG)、日报查询、日报生成三个核心业务节点。
+工具与基础设施层 (MCP & Pipeline)：通过 MCP 协议封装底层工具（向量检索、数据库查询），并通过异步任务解耦长耗时的 Pipeline（新闻抓取与处理）。
 '''
 import sys
 import os

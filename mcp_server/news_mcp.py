@@ -12,7 +12,6 @@ if project_root not in sys.path:
 from mcp.server.fastmcp import FastMCP
 from storage.db import get_connection, query_news, fetch_report_by_date
 from storage.vectorstore import get_retriever  # 引入向量库
-from pipeline.flows.daily_news_flow import daily_flow
 
 
 mcp = FastMCP("news-mcp")
