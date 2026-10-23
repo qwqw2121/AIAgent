@@ -197,7 +197,7 @@ sources:
       - Tech
       - Community
     # 注：偏重工程实践，对大模型推理优化、服务器端处理逻辑、系统架构等深度技术文章质量很高。
-      - name: Papers with Code (Trending)
+  - name: Papers with Code (Trending)
     type: rss
     url: https://paperswithcode.com/rss
     language: en
