@@ -40,7 +40,7 @@ vector_store/
 *.pkl
 *.npy
 *.npz
-
+*.db.bak
 # OS / editor
 .DS_Store
 Thumbs.db
