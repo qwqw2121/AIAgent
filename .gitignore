@@ -47,4 +47,5 @@ Thumbs.db
 .idea/
 .vscode/
 
-codebackup.txt
+codebackup.txt*.db
+*.db.bak
