@@ -85,19 +85,7 @@ from email.utils import parsedate_to_datetime
 from datetime import datetime, date, timedelta, timezone
 
 REPORT_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
-MAX_NEWS_FOR_LLM = 50
 
-
-def _day_range_ts(report_date: str):
-    d = date.fromisoformat(report_date)
-    start = datetime.combine(d, datetime.min.time(), tzinfo=timezone.utc)
-    return int(start.timestamp()), int((start + timedelta(days=1)).timestamp())
-
-
-from pipeline.utils import day_bounds_ts, SQL_TZ
-
-READY = ("clustered", "reported")      # 已走完全部处理的新闻
-MAX_NEWS_FOR_LLM = 50
 
 
 def find_pending_dates(limit=10):
@@ -291,15 +279,6 @@ def attach_news_info(report, valid_ids):
     conn.close()
     return report
 
-def mark_reported(report):
-    ids = {i for e in report.get("events", []) for i in e.get("news_ids", [])}
-    if not ids:
-        return
-    conn = get_db()
-    ph = ",".join("?" * len(ids))
-    conn.execute(f"UPDATE news SET status='reported' WHERE id IN ({ph})", list(ids))
-    conn.commit()
-    conn.close()
 # =========================================================
 # 保存日报
 # =========================================================
@@ -353,7 +332,7 @@ def mark_reported(report_date):
 
 def create_daily_report(report_date=None):
     if report_date is None:
-        report_date = date.today().isoformat()
+        report_date = datetime.now(timezone.utc).date().isoformat()
     elif isinstance(report_date, date):
         report_date = report_date.isoformat()
 

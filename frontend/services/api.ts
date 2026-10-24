@@ -14,6 +14,7 @@ export interface ReportNews {
   summary?: string;
   content?: string;
   llm_category?: string;
+  category?: string;
   keywords?: string | string[];
   importance?: number;
   url?: string;
@@ -47,49 +48,50 @@ export interface DashboardStats {
   total_news: number;
   today_news: number;
   important_news: number;
+  total_reports?: number; // 可选：后端提供后，首页不必再拉取全部日报来数数
 }
 
 export async function getDailyReport(date: string): Promise<DailyReport> {
   const response = await fetch(`${API_BASE}/api/daily-report/${date}`);
-  
+
   if (!response.ok) {
     if (response.status === 404) {
       throw new Error(`未找到 ${date} 的日报`);
     }
     throw new Error('获取日报失败');
   }
-  
+
   return response.json();
 }
 
 export async function getTodayReport(): Promise<DailyReport> {
   const response = await fetch(`${API_BASE}/api/daily-report/today`);
-  
+
   if (!response.ok) {
     throw new Error('获取今日日报失败');
   }
-  
+
   return response.json();
 }
 
-export async function getLatestReport(): Promise<DailyReport> {
-  const endDate = new Date().toISOString().split('T')[0];
-  const response = await fetch(`${API_BASE}/api/daily-report/range?start_date=2000-01-01&end_date=${endDate}`);
-  if (!response.ok) throw new Error('获取最新日报失败');
-  const reports = await response.json() as DailyReport[];
-  if (!reports.length) throw new Error('暂无日报');
-  return reports.sort((left, right) => right.date.localeCompare(left.date))[0];
-}
+// export async function getLatestReport(): Promise<DailyReport> {
+//   const endDate = new Date().toISOString().split('T')[0];
+//   const response = await fetch(`${API_BASE}/api/daily-report/range?start_date=2000-01-01&end_date=${endDate}`);
+//   if (!response.ok) throw new Error('获取最新日报失败');
+//   const reports = await response.json() as DailyReport[];
+//   if (!reports.length) throw new Error('暂无日报');
+//   return reports.sort((left, right) => right.date.localeCompare(left.date))[0];
+// }
 
 export async function getReportRange(startDate: string, endDate: string): Promise<DailyReport[]> {
   const response = await fetch(
     `${API_BASE}/api/daily-report/range?start_date=${startDate}&end_date=${endDate}`
   );
-  
+
   if (!response.ok) {
     throw new Error('获取日报范围失败');
   }
-  
+
   return response.json();
 }
 
@@ -100,13 +102,24 @@ export async function getTrends(days = 30): Promise<TrendData> {
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
-  const response = await fetch(`${API_BASE}/api/dashboard/stats`);
+  const response = await fetch(`${API_BASE}/api/dashboard/stats`, { cache: 'no-store' });
   if (!response.ok) throw new Error('获取数据库统计失败');
   return response.json();
 }
 
-export async function getImportantNews(limit = 30): Promise<ReportNews[]> {
-  const response = await fetch(`${API_BASE}/api/news/important?limit=${limit}`);
+/**
+ * 重要新闻。
+ * hours / minImportance 需要后端 /api/news/important 支持
+ * （参数名 hours、min_importance）；后端不认识这些参数时会被忽略，
+ * 此时返回的就是后端原有的默认结果。
+ */
+export async function getImportantNews(
+  options: { limit?: number; hours?: number; minImportance?: number } = {}
+): Promise<ReportNews[]> {
+  const params = new URLSearchParams({ limit: String(options.limit ?? 30) });
+  if (options.hours) params.set('hours', String(options.hours));
+  if (options.minImportance) params.set('min_importance', String(options.minImportance));
+  const response = await fetch(`${API_BASE}/api/news/important?${params.toString()}`, { cache: 'no-store' });
   if (!response.ok) throw new Error('获取重要新闻失败');
   return response.json();
 }
@@ -157,4 +170,18 @@ export async function streamAgent(question: string, sessionId: string, onEvent: 
     }
     if (done) return;
   }
+}
+
+export interface DashboardStats {
+  total_news: number;
+  today_news: number;
+  important_news: number;
+  total_reports?: number;
+  events_30d?: number;
+}
+
+export async function getLatestReport(): Promise<DailyReport> {
+  const response = await fetch(`${API_BASE}/api/daily-report/latest`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('暂无日报');
+  return response.json();
 }

@@ -7,6 +7,12 @@ from pathlib import Path
 
 DB_PATH = Path(os.getenv("NEWS_DB_PATH", Path(__file__).parent / "news.db"))
 
+import json
+import time
+from collections import Counter
+
+DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
+
 _init_lock = threading.Lock()
 _initialized = False
 
@@ -273,3 +279,117 @@ def table_exists(conn, table_name: str) -> bool:
     return conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
     ).fetchone() is not None
+
+import time
+
+DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
+
+def fetch_important_recent(limit=8, min_importance=7, hours=24):
+    since = int(time.time()) - hours * 3600
+    ph = ",".join("?" * len(DONE_STATUSES))
+    conn = get_connection()
+    try:
+        rows = conn.execute(f"""
+            SELECT id, title, source, published, summary,
+                   llm_category, importance, url
+            FROM news
+            WHERE is_duplicate = 0
+              AND importance >= ?
+              AND status IN ({ph})
+              AND published_ts >= ?
+            ORDER BY importance DESC, published_ts DESC
+            LIMIT ?
+        """, (min_importance, *DONE_STATUSES, since, limit)).fetchall()
+    finally:
+        conn.close()
+    keys = ["id", "title", "source", "published", "summary",
+            "llm_category", "importance", "url"]
+    return [dict(zip(keys, r)) for r in rows]
+
+
+import json
+import time
+from collections import Counter
+
+DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
+
+
+def fetch_trends(days: int = 30) -> dict:
+    """过去 N 天趋势总览：统计数字、热门技术、每日数量、重要事件"""
+    ph = ",".join("?" * len(DONE_STATUSES))
+    since = f"-{days} days"
+    conn = get_connection()
+    try:
+        # 1. 核心统计
+        row = conn.execute(
+            f"""SELECT COUNT(*),
+                       SUM(CASE WHEN importance >= 7 THEN 1 ELSE 0 END),
+                       COUNT(DISTINCT llm_category)
+                FROM news
+                WHERE is_duplicate = 0 AND status IN ({ph})
+                  AND published >= date('now', ?)""",
+            (*DONE_STATUSES, since),
+        ).fetchone()
+        total_news = row[0] or 0
+        important_news = row[1] or 0
+        hot_directions = row[2] or 0
+
+        # 2. 每日数量（按日期分组，不是按完整时间戳）
+        daily_counts = [
+            {"date": r[0], "count": r[1]}
+            for r in conn.execute(
+                f"""SELECT substr(published, 1, 10) AS d, COUNT(*)
+                    FROM news
+                    WHERE is_duplicate = 0 AND status IN ({ph})
+                      AND published >= date('now', ?)
+                    GROUP BY d ORDER BY d""",
+                (*DONE_STATUSES, since),
+            ).fetchall()
+        ]
+
+        # 3. 热门技术：keywords 是 JSON 字符串，统计词频
+        counter: Counter = Counter()
+        for (kw_json,) in conn.execute(
+            f"""SELECT keywords FROM news
+                WHERE is_duplicate = 0 AND status IN ({ph})
+                  AND published >= date('now', ?)""",
+            (*DONE_STATUSES, since),
+        ).fetchall():
+            try:
+                kws = json.loads(kw_json) if kw_json else []
+                if isinstance(kws, list):
+                    counter.update(k for k in kws if isinstance(k, str) and k.strip())
+            except (json.JSONDecodeError, TypeError):
+                continue
+        hot_tech = [{"name": k, "count": v} for k, v in counter.most_common(8)]
+
+        # 4. 重要事件：最近 7 份日报里的事件，取前 10 个
+        events = []
+        for (report_json,) in conn.execute(
+            "SELECT report_json FROM daily_reports ORDER BY report_date DESC LIMIT 7"
+        ).fetchall():
+            try:
+                for ev in (json.loads(report_json).get("events") or []):
+                    events.append({"rank": len(events) + 1, "title": ev.get("title", "")})
+                    if len(events) >= 10:
+                        break
+            except (json.JSONDecodeError, TypeError, AttributeError):
+                continue
+            if len(events) >= 10:
+                break
+
+        # 5. 主要事件数（去重后的标题数）
+        main_events = len({e["title"] for e in events})
+
+        return {
+            "days": days,
+            "total_news": total_news,
+            "important_news": important_news,
+            "main_events": main_events,
+            "hot_directions": hot_directions,
+            "hot_tech": hot_tech,
+            "daily_counts": daily_counts,
+            "events": events,
+        }
+    finally:
+        conn.close()

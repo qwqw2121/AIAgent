@@ -7,10 +7,9 @@ ROOT_DIR = Path(__file__).parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from datetime import date, datetime
-from contextlib import closing, asynccontextmanager
+from datetime import  datetime
+from contextlib import asynccontextmanager
 from typing import Optional
-import sqlite3
 from backend.deps import get_db
 import uuid
 
@@ -33,11 +32,8 @@ from backend.api.news import router as news_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.sources import router as sources_router
 from backend.api.events import router as events_router
-from backend.api.reports import router as reports_router
-from backend.api.rag import router as rag_router
-from backend.api.trends import router as trend_router
 
-from storage.db import get_connection
+from backend.api.trends import router as trend_router
 
 # ============================================================
 # lifespan：启动时初始化 Agent（MCP stdio 连接 + 编译图，只做一次）
@@ -77,8 +73,6 @@ app.add_middleware(
 app.include_router(dashboard_router)
 app.include_router(sources_router)
 app.include_router(events_router)
-app.include_router(reports_router)
-app.include_router(rag_router)
 app.include_router(trend_router)
 app.include_router(news_router)
 
@@ -167,27 +161,6 @@ async def ask(req: AskRequest):
         raise HTTPException(500, f"Agent 调用失败: {e}")
     return {"question": req.question, "session_id": req.session_id,
             "answer": result["messages"][-1].content}
-# @app.post("/api/ask")
-# async def ask(req: AskRequest):
-#     """自然语言问答入口：内部由 LangGraph Agent 路由（知识检索 / 日报简报）"""
-#     agent = getattr(app.state, "agent", None)
-#     if agent is None:
-#         raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
-
-#     try:
-#         result = await agent.ainvoke({"question": req.question})
-#     except Exception as e:
-#         raise HTTPException(status_code=500, detail=f"Agent 调用失败: {e}")
-
-#     return {
-#         "question": req.question,
-#         "session_id": req.session_id,
-#         "route": result.get("route"),
-#         "report_date": result.get("report_date"),
-#         "answer": result.get("answer", ""),
-#         "sources": result.get("sources", []),
-#     }
-
 
 @app.post("/api/chat")
 async def chat(req: AskRequest):
@@ -196,8 +169,11 @@ async def chat(req: AskRequest):
     if agent is None:
         raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
 
-    config = {"configurable": {"thread_id": req.session_id or "default"}}
-
+    # config = {"configurable": {"thread_id": req.session_id or "default"}}
+    config = {
+    "configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
+    "recursion_limit": 15,
+}
     async def event_stream():
         try:
             async for event in agent.astream_events(
@@ -262,6 +238,19 @@ def get_daily_report_range(
     rows = fetch_reports_range(conn, start_date, end_date)
     return [report_response(conn, row) for row in rows]
 
+@app.get("/api/daily-report/index")
+def get_daily_report_index(conn=Depends(get_db)):
+    rows = conn.execute(
+        "SELECT report_date, overview, report_json FROM daily_reports ORDER BY report_date DESC"
+    ).fetchall()
+    out = []
+    for r in rows:
+        try:
+            n = len(json.loads(r["report_json"]).get("events", []))
+        except (ValueError, TypeError):
+            n = 0
+        out.append({"date": r["report_date"], "overview": r["overview"], "event_count": n})
+    return out
 
 # 3. 动态：指定日期的日报（必须放最后）
 @app.get("/api/daily-report/{report_date}")
@@ -272,6 +261,7 @@ def get_daily_report(report_date: str, conn=Depends(get_db)):
     if not row:
         raise HTTPException(status_code=404, detail=f"未找到 {report_date} 的日报")
     return report_response(conn, row)
+
 
 
 import uvicorn

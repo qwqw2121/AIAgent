@@ -155,10 +155,16 @@ def _split_tools_by_group(all_tools):
 # ============================================================
 # 4. Agent 节点
 # ============================================================
-async def agent_node(state: MessagesState):
-    response = await agent_llm.ainvoke([SYSTEM_MSG] + state["messages"])
-    return {"messages": [response]}
+# async def agent_node(state: MessagesState):
+#     response = await agent_llm.ainvoke([SYSTEM_MSG] + state["messages"])
+#     return {"messages": [response]}
+from datetime import datetime, timezone
 
+async def agent_node(state: MessagesState):
+    today = datetime.now(timezone.utc).date().isoformat()
+    system = SystemMessage(SYSTEM_PROMPT.format(today=today))
+    response = await agent_llm.ainvoke([system] + state["messages"])
+    return {"messages": [response]}
 
 async def _run_tool_group(state: MessagesState, group_tools: list, group_name: str):
     """只执行属于 group_name 这一组的 tool_calls，独立超时+由节点级 RetryPolicy 负责重试。"""

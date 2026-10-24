@@ -3,8 +3,8 @@ pipeline/flows/daily_flow.py
 
 单日 AI 新闻处理流程
 """
-import faulthandler
-faulthandler.dump_traceback_later(60, exit=False)
+# import faulthandler
+# faulthandler.dump_traceback_later(60, exit=False)
 
 
 import os
@@ -32,6 +32,7 @@ from pipeline.tasks.embedding_task import embedding_task
 from pipeline.tasks.clustering_task import clustering_task
 from pipeline.tasks.report_task import report_task
 
+from datetime import date, datetime, timedelta, timezone
 
 @flow(
     name="daily-news-pipeline",
@@ -39,10 +40,10 @@ from pipeline.tasks.report_task import report_task
 )
 def daily_flow(run_date: date = None):
 
-    target_date = run_date or (
-        date.today() - timedelta(days=1)
-    )
-
+    # target_date = run_date or (
+    #     date.today() - timedelta(days=1)
+    # )
+    target_date = run_date or (datetime.now(timezone.utc).date() - timedelta(days=1))
     print("=" * 60)
     print(f"开始处理日期：{target_date}")
     print("=" * 60)
