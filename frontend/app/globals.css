@@ -120,89 +120,215 @@ a.hot-title:hover { color: var(--orange); }
   .reports-intro { flex-direction: column; gap: 24px; }
   .report-guide { flex-basis: auto; width: 100%; }
 }
-/* 操作栏：左返回、右打开 */
-.embedded-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-  gap: 16px;
-}
 
-/* 卡片网格：同一行等高（跟字最多的那张对齐） */
+.markdown-body p { margin: 0 0 8px; }
+.markdown-body p:last-child { margin-bottom: 0; }
+.markdown-body ul,
+.markdown-body ol { margin: 0 0 8px; padding-left: 20px; }
+.markdown-body li { margin: 2px 0; }
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3,
+.markdown-body h4 { margin: 10px 0 6px; font-size: 1em; font-weight: 600; line-height: 1.4; }
+.markdown-body code {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 4px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.markdown-body pre {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 8px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 0 0 8px;
+}
+.markdown-body pre code { background: none; padding: 0; }
+.markdown-body table { border-collapse: collapse; margin: 8px 0; width: 100%; }
+.markdown-body th,
+.markdown-body td { border: 1px solid rgba(0, 0, 0, 0.15); padding: 4px 8px; text-align: left; }
+.markdown-body blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid rgba(0, 0, 0, 0.15);
+  color: rgba(0, 0, 0, 0.6);
+}
+.markdown-body a { color: #2563eb; text-decoration: underline; }
+
+/* =====================================================
+   日报页：标题 + 月历
+   ===================================================== */
+.reports-intro {
+  max-width: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+  align-items: start;
+  padding-bottom: 34px;
+}
+.reports-intro-text p { margin: 20px 0 0; color: var(--muted); font: 16px/1.6 Arial, sans-serif; }
+
+.report-guide {
+  width: 100%;
+  margin: 0;
+  padding: 18px;
+  background: #fff;
+  border: 1px solid var(--line);
+  box-shadow: 0 2px 10px #17251f0d;
+}
+.guide-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 14px; }
+.guide-nav-group { display: flex; gap: 6px; }
+.guide-month { flex: 1; text-align: center; font-size: 17px; font-weight: 500; white-space: nowrap; }
+.guide-nav {
+  width: 30px; height: 30px; border-radius: 50%;
+  border: 1px solid var(--line); background: #fff; color: var(--ink);
+  font: 16px/1 Arial, sans-serif; cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.guide-nav:hover:not(:disabled) { border-color: var(--orange); color: var(--orange); background: #fff7f3; }
+.guide-nav:disabled { opacity: .3; cursor: not-allowed; }
+
+.guide-weekdays, .guide-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.guide-weekdays { margin-bottom: 8px; text-align: center; color: var(--muted); font: 12px Arial, sans-serif; }
+.guide-cell { display: flex; justify-content: center; }
+.guide-day {
+  width: 100%; max-width: 38px; aspect-ratio: 1; padding: 0;
+  display: grid; place-items: center; border-radius: 50%;
+  border: 1px solid transparent; background: transparent;
+  color: #b4bdb6; font: 13px Arial, sans-serif; font-variant-numeric: tabular-nums;
+}
+.guide-day.has-report {
+  color: var(--ink); background: var(--mint); border-color: var(--sage);
+  font-weight: 700; cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s, transform .15s;
+}
+.guide-day.has-report:hover { background: #fbe9e0; border-color: var(--orange); transform: scale(1.08); }
+.guide-day.is-today { outline: 2px dashed var(--ink); outline-offset: 2px; }
+.guide-day.is-selected,
+.guide-day.is-selected:hover { background: var(--orange); border-color: var(--orange); color: #fff; }
+.guide-foot { margin: 12px 0 0; text-align: center; color: var(--muted); font: 12px Arial, sans-serif; }
+
+/* =====================================================
+   日报页：本月概览卡片
+   ===================================================== */
+.month-overview { margin-top: 8px; }
+.month-overview-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid var(--ink);
+}
+.month-overview-head h2 { margin: 0; font-size: 25px; font-weight: 500; }
+.month-overview-head span { color: var(--muted); font: 12px Arial, sans-serif; }
+
 .report-calendar {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
+  gap: 14px;
   align-items: stretch;
 }
-
-/* 卡片：撑满高度，内容顶部对齐，下面留白 */
 .report-calendar-item {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 10px;
-  width: 100%;
-  height: 100%;
-  padding: 14px 16px;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 10px;
-  background: var(--card-bg, #fff);
-  text-align: left;
-  cursor: pointer;
+  display: flex; flex-direction: column; gap: 14px;
+  width: 100%; height: 100%; min-height: 0; padding: 18px 20px;
+  background: #fff; border: 1px solid var(--line);
+  color: var(--ink); text-align: left; text-decoration: none; cursor: pointer;
+  transition: transform .2s, border-color .2s, box-shadow .2s;
 }
-
 .report-calendar-item:hover {
-  background: var(--hover-bg, #f9fafb);
+  transform: translateY(-3px); border-color: var(--orange);
+  box-shadow: 0 12px 25px #17251f14;
 }
-
-/* 日期左、事件数右 */
 .report-calendar-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  width: 100%;
+  display: flex; justify-content: space-between; align-items: baseline;
+  gap: 10px; width: 100%;
+  padding-bottom: 12px; border-bottom: 1px solid var(--line);
 }
-
-/* 日期与数字统一字号 */
-.report-date {
-  font-weight: 600;
-  font-size: 1em;
+.report-calendar-item .report-date {
+  color: var(--ink); font: 600 16px Arial, sans-serif; letter-spacing: 0;
   font-variant-numeric: tabular-nums;
 }
-
-.report-count {
-  white-space: nowrap;
-  color: var(--muted, #6b7280);
-  font-size: 0.95em;
-  font-variant-numeric: tabular-nums;
+.report-calendar-item .report-date em {
+  margin-left: 8px; color: var(--orange);
+  font: 400 12px Arial, sans-serif; font-style: normal; letter-spacing: 1px;
 }
-
-.report-count strong {
-  font-weight: 700;
-  font-size: 1em;
-  color: inherit;
+.report-count { white-space: nowrap; color: var(--muted); font: 12px Arial, sans-serif; }
+.report-calendar-item .report-count strong {
+  float: none; color: var(--orange);
+  font: 500 26px/1 Georgia, serif; margin-right: 2px;
 }
-
-.report-count small {
-  font-size: 1em;
-}
-
-/* 事件总结：完整显示，不截断 */
-/* 事件总结：完整显示 + 两端对齐 */
+.report-calendar-item .report-count small { float: none; clear: none; font: 12px Arial, sans-serif; }
 .report-calendar-item p {
-  margin: 0;
-  font-size: 0.9em;
-  color: var(--muted, #6b7280);
-  line-height: 1.45;
-  text-align: justify;   /* 加上这行 */
+  clear: none; margin: 0;
+  color: #53645b; font: 13px/1.75 Arial, sans-serif;
+  text-align: justify; text-justify: inter-ideograph;
 }
 
-/* 月份标题 */
-.guide-month {
-  font-size: 1.1em;
-  font-weight: 600;
-  white-space: nowrap;
+/* 内嵌日报 */
+.report-embedded { padding-top: 28px; border-top: 1px solid var(--line); }
+.embedded-actions { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 8px; }
+.text-link { padding-bottom: 2px; border-bottom: 1px solid transparent; }
+.text-link:hover { border-bottom-color: var(--orange); }
+
+@media (max-width: 760px) {
+  .reports-intro { grid-template-columns: 1fr; gap: 24px; }
+  .report-calendar { grid-template-columns: 1fr; }
 }
+
+/* =====================================================
+   AI 助手
+   ===================================================== */
+.assistant-panel {
+  width: min(400px, calc(100vw - 40px));
+  height: min(620px, calc(100vh - 130px));
+  background: #fffdf9;
+  box-shadow: 0 18px 50px #23352c30;
+}
+.assistant-head { padding: 18px 20px; align-items: center; }
+.assistant-head h2 { font-size: 22px; }
+.assistant-head button { width: 32px; height: 32px; border-radius: 50%; line-height: 1; transition: background .15s, color .15s; }
+.assistant-head button:hover:not(:disabled) { background: var(--mint); color: var(--ink); }
+
+.assistant-body { padding: 18px 20px; scrollbar-width: thin; scrollbar-color: var(--sage) transparent; }
+.assistant-hint { margin: 0 0 12px; }
+
+.chat-message { margin-bottom: 18px; }
+.chat-message > span { display: block; margin-bottom: 5px; color: var(--orange); font: 11px Arial, sans-serif; letter-spacing: .5px; }
+.chat-message.user > span { text-align: right; }
+.chat-message.user p {
+  margin: 0 0 0 auto; width: fit-content; max-width: 88%;
+  background: var(--ink); color: #fff; padding: 10px 14px;
+  font: 14px/1.65 Arial, sans-serif; white-space: pre-wrap;
+}
+.chat-message.assistant .markdown-body {
+  background: #f1e9db; padding: 12px 14px;
+  font: 14px/1.7 Arial, sans-serif; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.chat-message.assistant .markdown-body p {
+  background: none; padding: 0; margin: 0 0 8px;
+  font: inherit; white-space: normal;
+}
+.chat-message.assistant .markdown-body p:last-child { margin-bottom: 0; }
+.markdown-body a { color: #c2552b; text-decoration: underline; text-underline-offset: 2px; }
+.markdown-body a:hover { color: var(--ink); }
+.markdown-body strong { font-weight: 700; }
+
+.download-button { transition: background .15s, border-color .15s; }
+.download-button:hover { border-color: var(--orange); background: #fbe9e0; }
+
+.assistant-form { transition: border-color .15s; background: #fff; }
+.assistant-form:focus-within { border-color: var(--orange); }
+.assistant-form button { transition: background .15s; }
+.assistant-form button:hover:not(:disabled) { background: var(--orange); }
+.assistant-form button:disabled { opacity: .5; cursor: wait; }
+
+@media (max-width: 760px) {
+  .assistant-panel { right: 12px; width: calc(100vw - 24px); }
+}
+
+/* 历史列表：生成中标记 */
+.history-loading { flex: 0 0 auto; padding: 0 10px; color: var(--orange); font: 11px Arial, sans-serif; white-space: nowrap; }
+
+/* 下载按钮：放在对应的回答下面 */
+.chat-message .download-button { display: inline-block; margin-top: 8px; }
+
+/* 输入框禁用态 */
+.assistant-form input:disabled { cursor: not-allowed; color: var(--muted); }

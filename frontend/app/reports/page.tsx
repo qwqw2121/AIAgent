@@ -13,6 +13,8 @@ const todayStr = () => new Date().toISOString().split('T')[0];
 function shiftMonth(month: string, delta: number) {
   const [y, m] = month.split('-').map(Number);
   const d = new Date(Date.UTC(y, m - 1 + delta, 1));
+  const weekdayOf = (date: string) =>
+  WEEKDAYS[(new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7];
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}`;
 }
 
@@ -81,7 +83,9 @@ export default function ReportsPage() {
   const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
   const firstWeekday = (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7;
   const today = todayStr();
-
+  const weekdayOf = (date: string) =>
+  WEEKDAYS[(new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7];
+  
   return (
     <main className="app-shell">
       <Header />
@@ -159,26 +163,35 @@ export default function ReportsPage() {
             </div>
             <ReportView report={selectedReport} embedded />
           </section>
-        ) : monthReports.length > 0 ? (
-          <div className="report-calendar">
-            {monthReports.map((report) => (
-              <button
-                type="button"
-                className="report-calendar-item"
-                key={report.date}
-                onClick={() => selectDate(report.date)}
-              >
-                <div className="report-calendar-head">
-                  <span className="report-date">{report.date}</span>
-                  <span className="report-count">
-                    <strong>{report.report.events.length}</strong>
-                    <small>个事件</small>
-                  </span>
-                </div>
-                <p>{report.overview || '查看当天 AI 新闻摘要'}</p>
-              </button>
-            ))}
-          </div>
+       ) : monthReports.length > 0 ? (
+          <section className="month-overview">
+            <div className="month-overview-head">
+              <h2>{year} 年 {month} 月 · 日报总结</h2>
+              <span>共 {monthCount} 期</span>
+            </div>
+            <div className="report-calendar">
+              {monthReports.map((report) => (
+                <button
+                  type="button"
+                  className="report-calendar-item"
+                  key={report.date}
+                  onClick={() => selectDate(report.date)}
+                >
+                  <div className="report-calendar-head">
+                    <span className="report-date">
+                      {report.date.slice(8)} 日
+                      <em>周{weekdayOf(report.date)}</em>
+                    </span>
+                    <span className="report-count">
+                      <strong>{report.report.events.length}</strong>
+                      <small> 个事件</small>
+                    </span>
+                  </div>
+                  <p>{report.overview || '查看当天 AI 新闻摘要'}</p>
+                </button>
+              ))}
+            </div>
+          </section>
         ) : (
           <section className="empty-panel">
             <h2>该月份暂无日报</h2>

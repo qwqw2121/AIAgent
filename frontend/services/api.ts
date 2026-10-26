@@ -145,11 +145,23 @@ export async function askAgent(question: string) {
 
 export type ChatEvent = { type: 'token' | 'tool' | 'error'; content?: string; name?: string };
 
-export async function streamAgent(question: string, sessionId: string, onEvent: (event: ChatEvent) => void) {
+// export async function streamAgent(question: string, sessionId: string, onEvent: (event: ChatEvent) => void) {
+//   const response = await fetch(`${API_BASE}/api/chat`, {
+//     method: 'POST',
+//     headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
+//     body: JSON.stringify({ question, session_id: sessionId }),
+//   });
+export async function streamAgent(
+  text: string,
+  sessionId: string,
+  onEvent: (ev: ChatEvent) => void,
+  signal?: AbortSignal,
+) {
   const response = await fetch(`${API_BASE}/api/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'text/event-stream' },
-    body: JSON.stringify({ question, session_id: sessionId }),
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question: text, session_id: sessionId }),  // 字段名沿用你原来的
+    signal,
   });
   if (!response.ok || !response.body) throw new Error('AI 助手暂时不可用');
 

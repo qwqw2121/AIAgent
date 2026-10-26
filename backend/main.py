@@ -48,11 +48,20 @@ async def lifespan(app: FastAPI):
         from agent.graph import init_agent
         app.state.agent = await init_agent()
         print("✅ 问答 Agent 初始化完成")
-    except Exception as e:
-        print(f"⚠️ 问答 Agent 初始化失败: {e}")
+    except Exception:
+        import traceback
+        traceback.print_exc()          # 打印完整堆栈，方便定位
+        print("⚠️ 问答 Agent 初始化失败，详见上方堆栈")
         app.state.agent = None
 
     yield
+
+    # 关闭时释放 MCP 持久会话
+    try:
+        from agent.graph import close_agent
+        await close_agent()
+    except Exception as e:
+        print(f"⚠️ 关闭 Agent 失败: {e}")
 
 
 app = FastAPI(title="AI News Agent API", version="0.4.0", lifespan=lifespan)
@@ -162,43 +171,59 @@ async def ask(req: AskRequest):
     return {"question": req.question, "session_id": req.session_id,
             "answer": result["messages"][-1].content}
 
+from fastapi import Request
+
 @app.post("/api/chat")
-async def chat(req: AskRequest):
+async def chat(req: AskRequest, request: Request):
     """Stream agent tokens and tool activity as Server-Sent Events."""
     agent = getattr(app.state, "agent", None)
     if agent is None:
         raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
 
-    # config = {"configurable": {"thread_id": req.session_id or "default"}}
     config = {
-    "configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
-    "recursion_limit": 15,
-}
+        "configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
+        "recursion_limit": 10,
+    }
+
+    def sse(obj: dict) -> str:
+        return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
+
     async def event_stream():
+        yield sse({"type": "tool", "name": ""})   # 立刻给前端一个"处理中"状态
         try:
             async for event in agent.astream_events(
                 {"messages": [HumanMessage(content=req.question)]},
                 config=config,
                 version="v2",
             ):
+                if await request.is_disconnected():   # 前端点了停止/断开，立即终止
+                    break
+
                 event_type = event.get("event")
                 metadata = event.get("metadata") or {}
+
                 if event_type == "on_chat_model_stream" and metadata.get("langgraph_node") == "agent":
-                    content = getattr(event.get("data", {}).get("chunk"), "content", "")
+                    chunk = event.get("data", {}).get("chunk")
+                    if getattr(chunk, "tool_call_chunks", None):
+                        continue                        # 跳过"决定调用工具"那一轮
+                    content = getattr(chunk, "content", "")
                     if content:
-                        yield f"data: {json.dumps({'type': 'token', 'content': content}, ensure_ascii=False)}\n\n"
+                        yield sse({"type": "token", "content": content})
                 elif event_type == "on_tool_start":
-                    yield f"data: {json.dumps({'type': 'tool', 'name': event.get('name', '工具')}, ensure_ascii=False)}\n\n"
+                    yield sse({"type": "tool", "name": event.get("name", "")})
             yield "data: [DONE]\n\n"
         except Exception as error:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(error)}, ensure_ascii=False)}\n\n"
+            yield sse({"type": "error", "content": f"{type(error).__name__}: {error}"})
 
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "Connection": "keep-alive"},
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )
-
 
 # ============================================================
 #  日报接口
