@@ -49,3 +49,14 @@ Thumbs.db
 
 codebackup.txt*.db
 *.db.bak
+.env
+storage/*.db
+storage/*.sqlite*
+storage/vector_db/
+storage/chat_memory/
+models/
+node_modules/
+.next/
+__pycache__/
+*.db-shm
+*.db-wal

@@ -1,38 +1,36 @@
-# ==========================================
-# 后端 Dockerfile (FastAPI + Prefect)
-# ==========================================
-
-# 1. 使用官方 Python 轻量级镜像
 FROM python:3.11-slim
 
-# 2. 设置工作目录
 WORKDIR /app
 
-# 3. 设置环境变量
-# PYTHONDONTWRITEBYTECODE: 防止生成 .pyc 文件，保持容器整洁
-# PYTHONUNBUFFERED: 确保 Python 日志直接输出到 Docker 控制台，不被缓冲
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
 
-# 4. 安装系统级依赖
-# build-essential: 用于编译 C/C++ 扩展（如 readability, lxml, faiss 等）
-# git: 如果你的 requirements.txt 中有 git+https://... 的依赖，必须安装 git
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# 5. 复制依赖文件并安装
-# 利用 Docker 缓存层，只要 requirements.txt 没变，下次构建就会秒过
-COPY requirements.txt .
+# 国内服务器可在 .env 里设 PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
+ARG PIP_INDEX_URL=https://pypi.org/simple
+ENV PIP_INDEX_URL=${PIP_INDEX_URL}
+
+# 是否安装本地 BGE 模型所需依赖（默认不装）
+ARG INSTALL_LOCAL_EMBED=false
+
+COPY requirements.txt requirements-local.txt ./
+
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# 如果 requirements 里有 torch / sentence-transformers / FlagEmbedding，
+# 取消下一行注释，先装 CPU 版 torch，避免拉几 GB 的 CUDA 依赖撑爆磁盘和构建时间
+# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# 6. 暴露 FastAPI 端口
 EXPOSE 8000
-
-# 7. 默认启动命令 (兜底，实际运行由 docker-compose 的 command 覆盖)
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

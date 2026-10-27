@@ -56,3 +56,12 @@ def upsert_news(news_id: int, title: str, summary: str, metadata: dict):
 
 def get_retriever(k=5):
     return vectorstore.as_retriever(search_kwargs={"k": k})
+
+def build_vectorstore():
+    return Chroma(
+        collection_name="news_embeddings",
+        embedding_function=embeddings,
+        persist_directory=PERSIST_DIR,
+    )
+
+vectorstore = build_vectorstore()

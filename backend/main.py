@@ -1,5 +1,6 @@
 # backend/main.py
 import sys
+import os  
 import json
 from pathlib import Path
 # 添加项目根目录到 sys.path（而不是 backend 目录）
@@ -12,8 +13,6 @@ from contextlib import asynccontextmanager
 from typing import Optional
 from backend.deps import get_db
 import uuid
-
-
 
 from fastapi import FastAPI, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
@@ -66,18 +65,24 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AI News Agent API", version="0.4.0", lifespan=lifespan)
 
+# 本地开发地址固定放行，线上地址通过环境变量 CORS_ORIGINS 配置（多个用英文逗号分隔）
+_cors_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+_cors_origins += [
+    o.strip().rstrip("/")
+    for o in os.getenv("CORS_ORIGINS", "").split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://77a35354.r16.cpolar.top",
-    ],
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 
 app.include_router(dashboard_router)
 app.include_router(sources_router)

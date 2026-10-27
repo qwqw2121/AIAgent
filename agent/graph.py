@@ -33,6 +33,7 @@ except ImportError:
     from langgraph.pregel.types import RetryPolicy  # type: ignore
     from langgraph.constants import Send  # type: ignore
 
+
 # ============================================================
 # 1. LLM 配置
 # ============================================================
@@ -278,6 +279,11 @@ async def _make_async_checkpointer():
         raw = (os.getenv("CHAT_MEMORY_DB_PATH") or "").strip()
         if not raw:
             raise RuntimeError("未配置 CHAT_MEMORY_DB_PATH")
+
+        db_path = os.path.expanduser(raw)
+        # 新增：Git 不跟踪空目录，新服务器/新容器上目录可能不存在，aiosqlite 不会自动创建
+        os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
+        
         conn = await aiosqlite.connect(os.path.expanduser(raw))
         saver = AsyncSqliteSaver(conn)
         await saver.setup()

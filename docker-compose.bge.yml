@@ -1,0 +1,17 @@
+services:
+  backend:
+    build:
+      args:
+        INSTALL_LOCAL_EMBED: "true"
+    volumes:
+      - ${BGE_MODEL_HOST_PATH:-./models/bge-m3}:/app/models/bge-m3:ro
+    environment:
+      BGE_MODEL_PATH: /app/models/bge-m3
+  prefect-worker:
+    build:
+      args:
+        INSTALL_LOCAL_EMBED: "true"
+    volumes:
+      - ${BGE_MODEL_HOST_PATH:-./models/bge-m3}:/app/models/bge-m3:ro
+    environment:
+      BGE_MODEL_PATH: /app/models/bge-m3
