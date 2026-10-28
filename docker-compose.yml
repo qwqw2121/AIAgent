@@ -20,7 +20,7 @@ services:
       dockerfile: docker/backend/Dockerfile
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    image: ${IMAGE_PREFIX:-local}/ai-news-backend:${TAG:-latest}
+    image: crpi-dyzkqvdwks3kog96.cn-beijing.personal.cr.aliyuncs.com/ainews1027/ai-news-backend:3dd9d02
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
       - "127.0.0.1:8000:8000"   # 只绑本机；nginx 走容器内网访问，不受影响
@@ -30,6 +30,10 @@ services:
       - .env
     environment:
       <<: *app-env
+      PREFECT_API_URL: http://prefect-server:4200/api
+    depends_on:
+      prefect-server:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=3)"]
       interval: 30s
@@ -46,8 +50,8 @@ services:
       context: .
       dockerfile: docker/frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-}
-    image: ${IMAGE_PREFIX:-local}/ai-news-frontend:${TAG:-latest}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-}   # 用 "-"：允许为空，空值表示前端走同源相对路径
+    image: crpi-dyzkqvdwks3kog96.cn-beijing.personal.cr.aliyuncs.com/ainews1027/ai-news-frontend:3dd9d02
     expose:
       - "3000"
     depends_on:
@@ -83,7 +87,7 @@ services:
       dockerfile: docker/backend/Dockerfile
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    image: ${IMAGE_PREFIX:-local}/ai-news-backend:${TAG:-latest} 
+    image: crpi-dyzkqvdwks3kog96.cn-beijing.personal.cr.aliyuncs.com/ainews1027/ai-news-backend:3dd9d02
     command: /bin/sh /app/docker/prefect/start-worker.sh
     volumes:
       - ./storage:/app/storage
