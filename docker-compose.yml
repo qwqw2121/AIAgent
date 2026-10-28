@@ -100,7 +100,7 @@ services:
       - ai-network
 
   nginx:
-    image: nginx:1.27-alpine
+    image: nginx:stable-alpine
     ports:
       - "80:80"
     volumes:
