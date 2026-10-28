@@ -31,13 +31,33 @@ from pipeline.tasks.analysis_task import analysis_task
 from pipeline.tasks.embedding_task import embedding_task
 from pipeline.tasks.clustering_task import clustering_task
 from pipeline.tasks.report_task import report_task
-
+from prefect import task, get_run_logger
 from datetime import date, datetime, timedelta, timezone
 
 @flow(
     name="daily-news-pipeline",
     log_prints=True,
 )
+
+
+
+@task(name="quality-check", retries=0)
+def quality_check_task(report_date: str):
+    logger = get_run_logger()
+    try:
+        from pipeline.quality import run_quality_check
+        r = run_quality_check(report_date)
+        if r.get("status") == "warn":
+            logger.warning(
+                f"⚠️ 日报质量告警 {report_date}: 疑似误并事件 {r['flagged']} 个，不相关新闻 {r['irrelevant']} 条"
+            )
+            for it in r["issues"]:
+                logger.warning(f"  - {it['title']}: {'; '.join(it['reasons'])}")
+        else:
+            logger.info(f"日报质量检查通过 {report_date}: {r}")
+    except Exception as e:
+        logger.warning(f"质量检查执行失败（不影响日报）: {type(e).__name__}: {e}")
+
 def daily_flow(run_date: date = None):
 
     # target_date = run_date or (
@@ -70,6 +90,8 @@ def daily_flow(run_date: date = None):
 
     # ⑦ 日报生成
     state = report_task(state)
+
+    quality_check_task(run_date.isoformat())
 
     # =========================
     # 运行统计

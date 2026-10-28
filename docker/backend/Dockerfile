@@ -6,29 +6,20 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|deb.debian.org|mirrors.aliyun.com|g; s|security.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list && \
+    apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# 国内服务器可在 .env 里设 PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
-ARG PIP_INDEX_URL=https://pypi.org/simple
+ARG PIP_INDEX_URL=https://mirrors.aliyun.com/pypi/simple/
 ENV PIP_INDEX_URL=${PIP_INDEX_URL}
-
-# 是否安装本地 BGE 模型所需依赖（默认不装）
-ARG INSTALL_LOCAL_EMBED=false
 
 COPY requirements.txt requirements-local.txt ./
 
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
-
-# 如果 requirements 里有 torch / sentence-transformers / FlagEmbedding，
-# 取消下一行注释，先装 CPU 版 torch，避免拉几 GB 的 CUDA 依赖撑爆磁盘和构建时间
-# RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
-
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip -i ${PIP_INDEX_URL} && \
+    pip install --no-cache-dir -i ${PIP_INDEX_URL} -r requirements.txt
 
 COPY . .
 

@@ -60,3 +60,5 @@ node_modules/
 __pycache__/
 *.db-shm
 *.db-wal
+*.tar
+*.tar.gz

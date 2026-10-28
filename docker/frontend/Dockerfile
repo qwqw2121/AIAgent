@@ -7,7 +7,7 @@ RUN npm config set registry https://registry.npmmirror.com
 COPY frontend/package.json frontend/package-lock.json* ./
 RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-ARG NEXT_PUBLIC_API_URL=http://localhost:8000
+ARG NEXT_PUBLIC_API_URL=
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY frontend/ ./
 RUN mkdir -p public            # 没有 public 目录时，后面的 COPY 不会失败
