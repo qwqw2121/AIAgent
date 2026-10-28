@@ -34,11 +34,6 @@ from pipeline.tasks.report_task import report_task
 from prefect import task, get_run_logger
 from datetime import date, datetime, timedelta, timezone
 
-@flow(
-    name="daily-news-pipeline",
-    log_prints=True,
-)
-
 
 
 @task(name="quality-check", retries=0)
@@ -58,6 +53,11 @@ def quality_check_task(report_date: str):
     except Exception as e:
         logger.warning(f"质量检查执行失败（不影响日报）: {type(e).__name__}: {e}")
 
+
+@flow(
+    name="daily-news-pipeline",
+    log_prints=True,
+)
 def daily_flow(run_date: date = None):
 
     # target_date = run_date or (
@@ -91,7 +91,7 @@ def daily_flow(run_date: date = None):
     # ⑦ 日报生成
     state = report_task(state)
 
-    quality_check_task(run_date.isoformat())
+    quality_check_task(target_date.isoformat())
 
     # =========================
     # 运行统计

@@ -97,6 +97,7 @@ def _run_daily_flow(report_date: str, force: bool):
         daily_flow(run_date=target)
         print(f"✅ 日报生成完成: {report_date}")
     except Exception as e:
+        traceback.print_exc()
         print(f"❌ 日报生成失败: {report_date}: {type(e).__name__}: {e}")
 
 
