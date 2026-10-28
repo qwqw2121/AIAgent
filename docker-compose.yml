@@ -20,7 +20,7 @@ services:
       dockerfile: docker/backend/Dockerfile
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    image: ai-news-backend:latest
+    image: ${IMAGE_PREFIX:-local}/ai-news-backend:${TAG:-latest}
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
     ports:
       - "127.0.0.1:8000:8000"   # 只绑本机；nginx 走容器内网访问，不受影响
@@ -46,7 +46,8 @@ services:
       context: .
       dockerfile: docker/frontend/Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-}   # 用 "-"：允许为空，空值表示前端走同源相对路径
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL-}
+    image: ${IMAGE_PREFIX:-local}/ai-news-frontend:${TAG:-latest}
     expose:
       - "3000"
     depends_on:
@@ -82,7 +83,7 @@ services:
       dockerfile: docker/backend/Dockerfile
       args:
         PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.org/simple}
-    image: ai-news-backend:latest
+    image: ${IMAGE_PREFIX:-local}/ai-news-backend:${TAG:-latest} 
     command: /bin/sh /app/docker/prefect/start-worker.sh
     volumes:
       - ./storage:/app/storage
