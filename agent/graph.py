@@ -76,6 +76,7 @@ BACKGROUND_TASKS: set = set()
 _GEN_LOCKS: dict = {}
 _GEN_LOCKS_GUARD = threading.Lock()
 
+import traceback
 
 def _run_daily_flow(report_date: str, force: bool):
     try:
