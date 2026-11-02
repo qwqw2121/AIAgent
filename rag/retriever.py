@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent / "embedding"))
 
 from sentence_transformers import SentenceTransformer
-from vector_store import VectorStore
+from embedding.vector_store import VectorStore
 
 # ============================================================
 # 配置

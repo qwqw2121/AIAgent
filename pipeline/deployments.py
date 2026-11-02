@@ -1,4 +1,4 @@
-# pipeline/deployments.py
+# pipeline/deployments.py  部署
 import sys
 from pathlib import Path
 

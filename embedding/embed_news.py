@@ -1,107 +1,108 @@
 # embedding/embed_news.py
 
-import os
-import sqlite3
 import json
+import os
 import time
-from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import date, timedelta
+from threading import Lock
+from typing import Optional
+
 from storage.db import get_connection, update_fields
+from embedding.vector_store import VectorStore
+
 # =====================================================
 # 1. 全局配置
 # =====================================================
-# DB_PATH = os.getenv("NEWS_DB_PATH", Path(__file__).parent.parent / "storage/news.db")
-
-# 🌟 核心开关：'online' (在线API) 或 'local' (本地BGE-M3)
-EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "online").lower() 
-
-# 在线模型配置
+EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "online").lower()
 EMBED_MODEL = os.getenv("LLM_EMBEDING", "text-embedding-v3")
-
-# 本地模型配置
 BGE_MODEL_PATH = os.getenv("BGE_MODEL_PATH", "/mnt/d/AI_Models/bge-m3")
+
+MAX_WORKERS = 5               # 并发线程数；本地模式动态降到 2
+RATE_LIMIT_PER_SEC = 3        # 全局每秒请求上限
+MAX_RETRY = 2                 # 单次运行内单条重试次数
+MAX_EMBED_ATTEMPTS = 3        # 跨运行累计失败上限，达到后不再捞起
+BATCH_COMMIT = 20             # 每处理多少条提交一次
+REQUEST_TIMEOUT = 60
 
 print(f"🚀 Embedding 模式: {EMBEDDING_PROVIDER.upper()}")
 
+vector_store = VectorStore()
+
+
 # =====================================================
-# 2. 引擎 1：本地 BGE-M3 (懒加载)
+# 2. 全局限流器
+# =====================================================
+class RateLimiter:
+    def __init__(self, per_sec: float):
+        self.interval = 1.0 / per_sec
+        self.lock = Lock()
+        self.next_time = 0.0
+
+    def wait(self):
+        with self.lock:
+            now = time.monotonic()
+            delay = self.next_time - now
+            if delay > 0:
+                time.sleep(delay)
+            self.next_time = max(now, self.next_time) + self.interval
+
+
+_rate_limiter = RateLimiter(RATE_LIMIT_PER_SEC)
+
+
+# =====================================================
+# 3. 引擎：本地 BGE-M3 / 在线 API
 # =====================================================
 _local_model = None
+_online_client = None
+
 
 def get_local_model():
     global _local_model
-    if _local_model is None and EMBEDDING_PROVIDER == 'local':
-        os.environ['CUDA_VISIBLE_DEVICES'] = ''  # 强制 CPU
+    if _local_model is None:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
         print(f"🔄 正在加载本地 BGE-M3 模型: {BGE_MODEL_PATH} (CPU)")
         from FlagEmbedding import BGEM3FlagModel
         _local_model = BGEM3FlagModel(BGE_MODEL_PATH, use_fp16=False, device="cpu")
     return _local_model
 
-# =====================================================
-# 3. 引擎 2：在线 API (懒加载)
-# =====================================================
-_online_client = None
 
 def get_online_client():
     global _online_client
-    if _online_client is None and EMBEDDING_PROVIDER == 'online':
+    if _online_client is None:
         from openai import OpenAI
-        API_KEY = os.getenv("LLM_API_KEY")
-        BASE_URL = os.getenv("LLM_BASE_URL")
-        if not API_KEY or not BASE_URL:
+        api_key = os.getenv("LLM_API_KEY")
+        base_url = os.getenv("LLM_BASE_URL")
+        if not api_key or not base_url:
             raise ValueError("❌ 使用在线 Embedding 需要在 .env 中配置 LLM_API_KEY 和 LLM_BASE_URL")
-        _online_client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
+        _online_client = OpenAI(
+            api_key=api_key, base_url=base_url,
+            timeout=REQUEST_TIMEOUT, max_retries=0,
+        )
     return _online_client
 
-# =====================================================
-# 4. 统一 Embedding 接口 (自动路由)
-# =====================================================
-def get_embedding(text: str):
-    """
-    根据 EMBEDDING_PROVIDER 自动选择本地或在线模型生成向量
-    返回: List[float] 或 None
-    """
+
+def get_embedding(text: str) -> Optional[list]:
     if not text or len(text.strip()) < 5:
         return None
-    
     try:
-        if EMBEDDING_PROVIDER == 'online':
-            # 🌟 在线 API 调用
-            client = get_online_client()
-            response = client.embeddings.create(
-                model=EMBED_MODEL,
-                input=text
-            )
-            return response.data[0].embedding
-            
+        if EMBEDDING_PROVIDER == "online":
+            resp = get_online_client().embeddings.create(model=EMBED_MODEL, input=text)
+            return resp.data[0].embedding
         else:
-            # 🌟 本地 BGE-M3 调用
-            model = get_local_model()
-            if model is None:
-                raise RuntimeError("本地模型未初始化，请检查 EMBEDDING_PROVIDER 配置")
-            
-            result = model.encode(text)
-            embedding = result['dense_vecs']
-            
-            # 兼容 numpy array 和 list
-            if hasattr(embedding, 'tolist'):
-                embedding = embedding.tolist()
-            return list(embedding)
-            
+            result = get_local_model().encode(text)
+            emb = result["dense_vecs"]
+            return emb.tolist() if hasattr(emb, "tolist") else list(emb)
     except Exception as e:
-        print(f"❌ Embedding 生成失败 ({EMBEDDING_PROVIDER}): {e}")
+        print(f"❌ Embedding 生成失败 ({EMBEDDING_PROVIDER}): {e}", flush=True)
         return None
 
-# =====================================================
-# 5. 辅助函数 (保持不变)
-# =====================================================
-from embedding.vector_store import VectorStore
-vector_store = VectorStore()
 
-# embedding/embed_news.py (只需修改 build_embedding_text 函数)
-
-def build_embedding_text(row):
-    """使用LLM分析结果构造Embedding文本 (严格防御版)"""
-    # 🌟 强制转字符串，杜绝 None
+# =====================================================
+# 4. 构造嵌入文本
+# =====================================================
+def build_embedding_text(row) -> str:
     title = str(row["title"]).strip() if row["title"] else "未知标题"
     summary = str(row["summary"]).strip() if row["summary"] else "无摘要"
     category = str(row["llm_category"]).strip() if row["llm_category"] else "未分类"
@@ -115,112 +116,157 @@ def build_embedding_text(row):
 
     keywords_text = ", ".join(str(k) for k in keywords) if isinstance(keywords, list) else str(keywords)
 
-    text = f"""标题：{title}
-摘要：{summary}
-分类：{category}
-关键词：{keywords_text}""".strip()
-    
-    # 🚨 确保绝不返回空字符串
-    return text if text else "无有效内容"
+    text = (
+        f"标题：{title}\n"
+        f"摘要：{summary}\n"
+        f"分类：{category}\n"
+        f"关键词：{keywords_text}"
+    ).strip()
+    return text or "无有效内容"
 
+
+# =====================================================
+# 5. 读取待处理新闻
+# =====================================================
 def load_news(conn, start_ts, end_ts):
-    return conn.execute("""
-        SELECT id, title, summary, llm_category, keywords, source, category, published
+    """
+    只捞 analyzed / embed_failed 且失败次数未达上限的记录。
+    达到上限的 embed_failed 会留在表里，但不再被取出重试。
+    """
+    return conn.execute(
+        """
+        SELECT id, title, summary, llm_summary, llm_category, keywords,
+               source, category, published, COALESCE(embed_attempts, 0) AS embed_attempts
         FROM news
         WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
+          AND COALESCE(embed_attempts, 0) < ?
           AND published_ts >= ? AND published_ts < ?
         ORDER BY id
-    """, (start_ts, end_ts)).fetchall()
+        """,
+        (MAX_EMBED_ATTEMPTS, start_ts, end_ts),
+    ).fetchall()
 
 
 # =====================================================
-# 6. 测试与主流程
+# 6. 单条工作单元（工作线程调用，不碰数据库）
 # =====================================================
-def test_embedding():
-    """测试 Embedding 是否正常工作"""
-    test_text = "测试文本：这是一条关于AI的新闻"
+def _embed_one(row) -> tuple:
+    text = build_embedding_text(row)
+    for attempt in range(MAX_RETRY + 1):
+        try:
+            _rate_limiter.wait()
+            emb = get_embedding(text)
+            if emb is not None:
+                return row["id"], text, emb
+        except Exception as e:
+            print(f"  ⚠️ id={row['id']} 第{attempt + 1}次失败: {e}", flush=True)
+        if attempt < MAX_RETRY:
+            time.sleep(2 ** attempt)
+    return row["id"], text, None
+
+
+# =====================================================
+# 7. 测试
+# =====================================================
+def test_embedding() -> bool:
     print(f"\n🧪 测试 Embedding ({EMBEDDING_PROVIDER})...")
-    
-    start_time = time.time()
-    embedding = get_embedding(test_text)
-    cost_time = time.time() - start_time
-    
-    if embedding:
-        print(f"   ✅ 成功生成向量 (耗时: {cost_time:.2f}s)")
-        print(f"   向量维度: {len(embedding)}")
+    start = time.time()
+    emb = get_embedding("测试文本：这是一条关于AI的新闻")
+    cost = time.time() - start
+    if emb:
+        print(f"   ✅ 成功生成向量 (耗时: {cost:.2f}s, 维度: {len(emb)})")
         return True
-    else:
-        print(f"   ❌ 测试失败")
-        return False
-
-def load_news(conn, start_ts, end_ts):
-    return conn.execute("""
-        SELECT id, title, summary, llm_category, keywords, source, category, published
-        FROM news
-        WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
-          AND published_ts >= ? AND published_ts < ?
-        ORDER BY id
-    """, (start_ts, end_ts)).fetchall()
+    print("   ❌ 测试失败")
+    return False
 
 
-# 整个 update_status 函数删掉
+# =====================================================
+# 8. 主流程
+# =====================================================
+def run(start_ts, end_ts, skip_test: bool = False) -> dict:
+    workers = MAX_WORKERS
+    if EMBEDDING_PROVIDER == "local":
+        get_local_model()   # 预加载，避免线程池内重复加载
+        workers = 2         # 本地推理并发不宜过高
 
-
-def run(start_ts, end_ts):
-    if not test_embedding():
+    if not skip_test and not test_embedding():
         print("❌ Embedding 测试失败，请检查配置")
         return {"total": 0, "success": 0, "failed": 0, "error": "embedding test failed"}
 
     conn = get_connection(row_factory=True)
     try:
         news_list = load_news(conn, start_ts, end_ts)
-        print(f"\n📊 待向量化新闻：{len(news_list)} 条")
+        total = len(news_list)
+        print(f"\n📊 待向量化新闻：{total} 条")
+        if not total:
+            return {"total": 0, "success": 0, "failed": 0}
 
-        success_count = fail_count = 0
+        ok = fail = 0
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                futures = {ex.submit(_embed_one, r): r for r in news_list}
+                for i, fut in enumerate(as_completed(futures), 1):
+                    row = futures[fut]
+                    news_id = row["id"]
+                    try:
+                        _, text, emb = fut.result()
+                    except Exception as e:
+                        text, emb = None, None
+                        print(f"  ❌ id={news_id} 异常: {e}", flush=True)
 
-        for i, row in enumerate(news_list, 1):
-            news_id = row["id"]
-            print(f"[{i}/{len(news_list)}] 处理 ID={news_id}")
-            try:
-                embedding_text = build_embedding_text(row)
-                embedding = get_embedding(embedding_text)
+                    attempts = (row["embed_attempts"] or 0) + 1
 
-                if embedding is None:
-                    update_fields(conn, news_id, {"status": "embed_failed"})
-                    fail_count += 1
-                    continue
+                    if emb is None:
+                        # 只保留 embed_failed；达到上限后仅记录次数，不再被 load_news 捞起
+                        update_fields(
+                            conn, news_id,
+                            {"status": "embed_failed", "embed_attempts": attempts},
+                            commit=False,
+                        )
+                        fail += 1
+                    else:
+                        try:
+                            vector_store.add_news(
+                                news_id=news_id,
+                                embedding=emb,
+                                embedding_text=text,
+                                metadata={
+                                    "news_id": news_id,
+                                    "title": row["title"] or "",
+                                    "source": row["source"] or "",
+                                    "category": row["category"] or "",
+                                    "published_at": row["published"] or "",
+                                },
+                            )
+                            update_fields(
+                                conn, news_id,
+                                {"status": "embedded", "embed_attempts": attempts},
+                                commit=False,
+                            )
+                            ok += 1
+                        except Exception as e:
+                            print(f"  ❌ id={news_id} 写向量库失败: {e}", flush=True)
+                            update_fields(
+                                conn, news_id,
+                                {"status": "embed_failed", "embed_attempts": attempts},
+                                commit=False,
+                            )
+                            fail += 1
 
-                vector_store.add_news(
-                    news_id=news_id,
-                    embedding=embedding,
-                    embedding_text=embedding_text,
-                    metadata={
-                        "news_id": news_id,
-                        "title": row["title"] or "",
-                        "source": row["source"] or "",
-                        "category": row["category"] or "",
-                        "published_at": row["published"] or "",
-                    },
-                )
-                update_fields(conn, news_id, {"status": "embedded"})
-                success_count += 1
-
-            except Exception as e:
-                fail_count += 1
-                print(f"  ❌ 失败: {e}")
-                import traceback
-                traceback.print_exc()
-                update_fields(conn, news_id, {"status": "embed_failed"})
+                    if i % BATCH_COMMIT == 0:
+                        conn.commit()
+                    print(f"[{i}/{total}] id={news_id} {'✅' if emb is not None else '❌'}", flush=True)
+        finally:
+            conn.commit()
 
         print(f"\n{'=' * 60}")
-        print(f"📊 Embedding 完成: 成功 {success_count}, 失败 {fail_count}")
-        return {"total": len(news_list), "success": success_count, "failed": fail_count}
+        print(f"📊 Embedding 完成: 成功 {ok}, 失败 {fail}, 总计 {total}")
+        return {"total": total, "success": ok, "failed": fail}
     finally:
         conn.close()
 
 
 if __name__ == "__main__":
     from pipeline.utils import day_bounds_ts
-    from datetime import date, timedelta
     s, e = day_bounds_ts((date.today() - timedelta(days=1)).isoformat())
     print(run(s, e))

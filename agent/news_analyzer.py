@@ -1,121 +1,113 @@
 """
 ⑤ LLM结构化分析
-只处理第一轮去重后剩下的、状态为 extracted 的记录,
-分析完写回数据库并置 status='analyzed'。
+处理第一轮去重后剩下的、状态为 deduped（或上次分析失败 analyze_failed）的记录，
+分析完写回数据库并置 status='analyzed'；失败则置 status='analyze_failed'，下次自动重试。
+
+支持按 published_ts 时间窗口过滤，供按天流水线调用：
+    run(start_ts=..., end_ts=...)
 """
 import json
 import os
 import time
-from pathlib import Path
-from typing import List, Dict, Any, Sequence, Union
-
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from threading import Semaphore
-import time
-from storage.db import get_connection, fetch_by_status, update_fields
-MAX_WORKERS = 5                 # LLM API 通常有并发限制，建议比正文提取更保守
-RATE_LIMIT_PER_SEC = 3          # 需要参考你的 API 服务商速率限制文档
-_rate_limiter = Semaphore(RATE_LIMIT_PER_SEC)
+from textwrap import dedent
+from threading import Lock
+from typing import Any, Dict, Optional
+
+from dotenv import load_dotenv
+
+from storage.db import get_connection, update_fields
 
 try:
     from openai import OpenAI
 except ImportError as e:
     raise ImportError("缺少依赖 openai，请先安装：pip install openai") from e
-from dotenv import load_dotenv
-
-
-# 设置路径
-# BASE_DIR = Path(__file__).parent.parent
-# DB_PATH = BASE_DIR / "storage/news.db"
 
 load_dotenv()
 
 # ============================================================
-# LLM 配置
+# 配置
 # ============================================================
 
-API_KEY = os.getenv(
-    "LLM_API_KEY"
-)
+MAX_WORKERS = 5               # 并发线程数，LLM API 通常有并发限制，宜保守
+RATE_LIMIT_PER_SEC = 3        # 全局每秒最多发起的请求数，请参考服务商限速文档
+MAX_CONTENT_CHARS = 3000      # 送入模型的正文最大字符数
+REQUEST_TIMEOUT = 60          # 单次请求超时（秒）
+BATCH_COMMIT = 15             # 每处理多少条提交一次数据库
 
-BASE_URL = os.getenv(
-    "LLM_BASE_URL"
-)
+CATEGORIES = {"大模型发布", "融资并购", "政策监管", "研究论文", "产品发布", "行业观点", "其他"}
 
-MODEL_NAME = os.getenv(
-    "LLM_ANALYSE"
-)
+API_KEY = os.getenv("LLM_API_KEY")
+BASE_URL = os.getenv("LLM_BASE_URL")
+MODEL_NAME = os.getenv("LLM_ANALYSE")
 
-client = OpenAI(
-    api_key=API_KEY,
-    base_url=BASE_URL,
-)
+for _name, _val in [("LLM_API_KEY", API_KEY), ("LLM_BASE_URL", BASE_URL), ("LLM_ANALYSE", MODEL_NAME)]:
+    if not _val:
+        raise RuntimeError(f"缺少环境变量 {_name}，请检查 .env 文件")
 
-MAX_CONTENT_CHARS = 3000
+# max_retries=0：重试由本文件自己控制，避免和 SDK 内部重试叠加
+client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=REQUEST_TIMEOUT, max_retries=0)
 
 
+# ============================================================
+# 全局限流器：保证所有线程合计不超过 RATE_LIMIT_PER_SEC 次/秒
+# ============================================================
 
-# def update_fields(conn: sqlite3.Connection, news_id: int, fields: Dict[str, Any]) -> bool:
-#     """
-#     更新新闻记录的指定字段
-#     """
-#     if not fields:
-#         return False
-    
-#     # keywords如果是列表，转为JSON字符串
-#     if 'keywords' in fields and isinstance(fields['keywords'], list):
-#         fields['keywords'] = json.dumps(fields['keywords'], ensure_ascii=False)
-    
-#     set_clause = ', '.join([f"{key} = ?" for key in fields.keys()])
-#     values = list(fields.values())
-#     values.append(news_id)
-    
-#     try:
-#         conn.execute(f"UPDATE news SET {set_clause} WHERE id = ?", values)
-#         conn.commit()
-#         return True
-#     except Exception as e:
-#         print(f"更新失败: {e}")
-#         return False
+class RateLimiter:
+    def __init__(self, per_sec: float):
+        self.interval = 1.0 / per_sec
+        self.lock = Lock()
+        self.next_time = 0.0
 
+    def wait(self):
+        with self.lock:
+            now = time.monotonic()
+            delay = self.next_time - now
+            if delay > 0:
+                time.sleep(delay)
+            self.next_time = max(now, self.next_time) + self.interval
+
+
+_rate_limiter = RateLimiter(RATE_LIMIT_PER_SEC)
+
+
+# ============================================================
+# LLM 调用
+# ============================================================
 
 def analyze_news(title: str, content: str) -> dict:
-    """
-    调用LLM分析新闻
-    """
-    # 如果content为空，使用title作为备用
+    """调用 LLM 分析单条新闻，返回解析后的 JSON 字典"""
     if not content or len(content.strip()) < 10:
         content = title
-    
     content = content[:MAX_CONTENT_CHARS]
-    
-    prompt = f"""
-            你是AI资讯分析专家。
-            分析下面新闻：
-            标题:
-            {title}
-            正文:
-            {content}
-            输出JSON:
-            {{
-            "summary": "",
-            "category": "",
-            "keywords": [],
-            "importance": 1
-            }}
-            要求：
-            - summary控制在80-120字，突出新闻的核心事实和影响
-            - category从以下选择: 大模型发布|融资并购|政策监管|研究论文|产品发布|行业观点|其他
-            - keywords 3-5个
-            - importance范围1-10，10代表行业级重大事件(如头部公司发布新一代模型)，1代表边角小消息
-            - summary必须是你对新闻事件的概括性转述，不能是原文的同义词替换或句式微调
-            - 严禁逐句改写原文表述，要用你自己的语言重新组织信息
-            """
-    
+
+    prompt = dedent(f"""\
+        你是AI资讯分析专家。
+        分析下面新闻：
+        标题:
+        {title}
+        正文:
+        {content}
+
+        输出JSON，格式如下:
+        {{
+          "summary": "概括性摘要",
+          "category": "分类",
+          "keywords": ["关键词1", "关键词2", "关键词3"],
+          "importance": 整数
+        }}
+
+        要求：
+        - summary控制在80-120字，突出新闻的核心事实和影响
+        - category从以下选择: 大模型发布|融资并购|政策监管|研究论文|产品发布|行业观点|其他
+        - keywords 3-5个
+        - importance为1-10的整数，10代表行业级重大事件(如头部公司发布新一代模型)，1代表边角小消息，请根据实际重要程度打分
+        - summary必须是你对新闻事件的概括性转述，不能是原文的同义词替换或句式微调
+        - 严禁逐句改写原文表述，要用你自己的语言重新组织信息
+        """)
+
     response = client.chat.completions.create(
         model=MODEL_NAME,
-        # model="glm-5.2",
-        # model = "deepseek-v4-flash",
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
         temperature=0.3,
@@ -123,194 +115,195 @@ def analyze_news(title: str, content: str) -> dict:
     return json.loads(response.choices[0].message.content)
 
 
-def fetch_window(conn, start_ts, end_ts, limit=None):
-    sql = """SELECT * FROM news
-             WHERE status IN ('deduped', 'analyze_failed')
-               AND is_duplicate = 0
-               AND published_ts >= ? AND published_ts < ?
-             ORDER BY id"""
-    params = [start_ts, end_ts]
-    if limit:
-        sql += " LIMIT ?"
-        params.append(limit)
+def _normalize(result: Dict[str, Any]) -> Dict[str, Any]:
+    """校验并清洗 LLM 输出，返回可直接写库的字段字典"""
+    summary = result.get("summary", "")
+    summary = summary.strip() if isinstance(summary, str) else ""
+
+    category = result.get("category", "其他")
+    if category not in CATEGORIES:
+        category = "其他"
+
+    keywords = result.get("keywords", [])
+    if not isinstance(keywords, list):
+        keywords = []
+    keywords = [str(k).strip() for k in keywords if str(k).strip()][:5]
+
+    try:
+        importance = max(1, min(10, int(result.get("importance", 1))))
+    except (TypeError, ValueError):
+        importance = 1
+
+    return {
+        "summary": summary,
+        "llm_category": category,
+        "keywords": json.dumps(keywords, ensure_ascii=False),
+        "importance": importance,
+        "status": "analyzed",
+    }
+
+
+def _analyze_one(row: dict, max_retry: int):
+    """分析单条记录（在工作线程中运行），失败按指数退避重试"""
+    content = row.get("content") or row.get("summary") or ""
+    result: Optional[dict] = None
+
+    for attempt in range(max_retry + 1):
+        try:
+            _rate_limiter.wait()
+            result = analyze_news(row["title"], content)
+            break
+        except Exception as e:
+            print(f"  ⚠️ id={row['id']} 第{attempt + 1}次失败: {e}", flush=True)
+            if attempt < max_retry:
+                time.sleep(2 ** attempt)
+
+    return row["id"], result
+
+
+# ============================================================
+# 数据读取
+# ============================================================
+
+def fetch_pending(conn, max_items: int, per_source_cap: int,
+                  start_ts=None, end_ts=None):
+    """
+    取待分析记录：每个来源最多取 per_source_cap 条最新的，
+    再按发布时间倒序总共取 max_items 条，避免单一来源占满额度。
+
+    传入 start_ts/end_ts 时，只取 published_ts 落在 [start_ts, end_ts) 的记录。
+    """
+    sql = """
+        SELECT * FROM (
+            SELECT n.*,
+                   ROW_NUMBER() OVER (PARTITION BY source ORDER BY published_ts DESC) AS rn
+            FROM news n
+            WHERE status IN ('deduped', 'analyze_failed')
+              AND is_duplicate = 0
+    """
+    params = []
+
+    if start_ts is not None:
+        sql += " AND published_ts >= ? AND published_ts < ?"
+        params += [start_ts, end_ts]
+
+    sql += """
+        )
+        WHERE rn <= ?
+        ORDER BY published_ts DESC
+        LIMIT ?
+    """
+    params += [per_source_cap, max_items]
+
     cur = conn.execute(sql, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, r)) for r in cur.fetchall()]
 
 
-def _analyze_one(row, max_retry):
-    content = row.get("content") or row.get("summary") or ""
-    result = None
-    for attempt in range(max_retry + 1):
-        try:
-            result = analyze_news(row["title"], content)
-            break
-        except Exception as e:
-            print(f"  ⚠️ id={row['id']} 第{attempt+1}次失败: {e}", flush=True)
-            time.sleep(2)
-    time.sleep(1.0 / RATE_LIMIT_PER_SEC)
-    return row["id"], result
+# ============================================================
+# 主流程
+# ============================================================
 
+def run(max_items: int = 150, per_source_cap: int = 30, max_retry: int = 2,
+        start_ts=None, end_ts=None) -> dict:
+    """
+    并发运行 LLM 结构化分析（批量提交版）。
 
-def fetch_pending(conn, max_items, per_source_cap):
-    cur = conn.execute("""
-        SELECT * FROM (
-            SELECT n.*,
-                   ROW_NUMBER() OVER (PARTITION BY source ORDER BY published_ts DESC) AS rn
-            FROM news n
-            WHERE status IN ('deduped', 'analyze_failed') AND is_duplicate = 0
-        )
-        WHERE rn <= ?
-        ORDER BY published_ts DESC
-        LIMIT ?
-    """, (per_source_cap, max_items))
-    cols = [c[0] for c in cur.description]
-    return [dict(zip(cols, r)) for r in cur.fetchall()]
+    Args:
+        max_items: 本次最多处理条数
+        per_source_cap: 每个来源最多处理条数
+        max_retry: 单条失败后的最大重试次数
+        start_ts: 可选，只处理 published_ts >= start_ts 的记录
+        end_ts:   可选，只处理 published_ts < end_ts 的记录
+                  start_ts 和 end_ts 需同时提供
+    """
+    if (start_ts is None) != (end_ts is None):
+        raise ValueError("start_ts 和 end_ts 必须同时提供")
+    if start_ts is not None and start_ts >= end_ts:
+        raise ValueError("start_ts 必须小于 end_ts")
 
-
-def run(max_items=150, per_source_cap=30, max_retry=2, start_ts=None, end_ts=None):
     conn = get_connection()
     try:
-        rows = fetch_pending(conn, max_items, per_source_cap)
+        rows = fetch_pending(
+            conn, max_items, per_source_cap,
+            start_ts=start_ts, end_ts=end_ts,
+        )
         if not rows:
+            print("✅ 没有待分析或可重试的新闻")
             return {"total": 0, "success": 0, "failed": 0}
 
-        ok = fail = 0
-        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
-            futures = {ex.submit(_analyze_one, r, max_retry): r for r in rows}
-            for i, fut in enumerate(as_completed(futures), 1):
-                try:
-                    news_id, result = fut.result()
-                except Exception as e:
-                    news_id, result = futures[fut]["id"], None
-                    print(f"  ❌ id={news_id} 异常: {e}", flush=True)
+        total = len(rows)
+        print(f"📊 待LLM分析/重试: {total} 条")
+        ok = fail = pending = 0
 
-                if result is None:
-                    update_fields(conn, news_id, {"status": "analyze_failed"})
-                    fail += 1
-                else:
-                    update_fields(conn, news_id, {
-                        "summary": result.get("summary", ""),
-                        "llm_category": result.get("category", ""),
-                        "keywords": result.get("keywords", []),
-                        "importance": result.get("importance", 1),
-                        "status": "analyzed",
-                    })
-                    ok += 1
-                print(f"[{i}/{len(rows)}] id={news_id} {'✅' if result else '❌'}", flush=True)
-        return {"total": len(rows), "success": ok, "failed": fail}
+        try:
+            # 工作线程只调用 LLM；所有数据库读写都在主线程，避免 sqlite 线程问题
+            with ThreadPoolExecutor(max_workers=MAX_WORKERS) as ex:
+                futures = {ex.submit(_analyze_one, r, max_retry): r for r in rows}
+                for i, fut in enumerate(as_completed(futures), 1):
+                    news_id = futures[fut]["id"]
+                    try:
+                        _, result = fut.result()
+                    except Exception as e:
+                        result = None
+                        print(f"  ❌ id={news_id} 异常: {e}", flush=True)
+
+                    success = False
+                    if result is not None:
+                        try:
+                            success = update_fields(
+                                conn, news_id, _normalize(result), commit=False
+                            ) is not False
+                        except Exception as e:
+                            print(f"  ❌ id={news_id} 写库失败: {e}", flush=True)
+
+                    if success:
+                        ok += 1
+                    else:
+                        update_fields(conn, news_id, {"status": "analyze_failed"}, commit=False)
+                        fail += 1
+
+                    pending += 1
+                    if pending >= BATCH_COMMIT:
+                        conn.commit()
+                        pending = 0
+
+                    print(f"[{i}/{total}] id={news_id} {'✅' if success else '❌'}", flush=True)
+        finally:
+            # 正常结束、异常或 Ctrl+C 中断时，都把已完成的结果提交
+            conn.commit()
+
+        print(f"\n📊 本次完成：成功 {ok}，失败 {fail}，共 {total}")
+        return {"total": total, "success": ok, "failed": fail}
     finally:
         conn.close()
-#串行
-# def run(sleep_sec: float = 0.5, max_retry: int = 2, limit: int = None):
-#     """
-#     运行LLM结构化分析
-    
-#     Args:
-#         sleep_sec: 每次请求间隔秒数
-#         max_retry: 最大重试次数
-#         limit: 限制处理数量，None表示全部
-#     """
-#     conn = get_connection()
-    
-#     try:
-#         # 获取待分析的记录，包括之前分析失败但可重试的新闻 提取后extracted-》去重后deduped
-#         rows = fetch_by_status(conn, status=("deduped", "analyze_failed"), limit=limit)
-
-#         if not rows:
-#             print("✅ 没有待分析或可重试的新闻")
-#             return
-
-#         print(f"📊 待LLM分析/重试: {len(rows)} 条")
-        
-#         success_count = 0
-#         fail_count = 0
-        
-#         for i, row in enumerate(rows, 1):
-#             print(f"\n[{i}/{len(rows)}] 处理: {row['title'][:40]}...")
-            
-#             # 准备内容：优先使用content，如果没有则用summary
-#             content = row.get("content") or row.get("summary") or ""
-            
-#             result = None
-#             for attempt in range(max_retry + 1):
-#                 try:
-#                     result = analyze_news(row["title"], content)
-#                     break
-#                 except Exception as e:
-#                     print(f"  ⚠️ 第{attempt + 1}次调用失败: {e}")
-#                     if attempt < max_retry:
-#                         time.sleep(2)
-            
-#             if result is None:
-#                 print(f"  ❌ 分析失败")
-#                 update_fields(conn, row["id"], {"status": "analyze_failed"})
-#                 fail_count += 1
-#                 continue
-            
-#             # 更新数据库（使用正确的字段名）
-#             success = update_fields(conn, row["id"], {
-#                 "summary": result.get("summary", ""),      # 使用 summary 而不是 llm_summary
-#                 "llm_category": result.get("category", ""),
-#                 "keywords": result.get("keywords", []),
-#                 "importance": result.get("importance", 1),
-#                 "status": "analyzed",
-#             })
-            
-#             if success:
-#                 success_count += 1
-#                 print(f"  ✅ 分析完成: {result.get('category', 'N/A')} | 重要性: {result.get('importance', 1)}")
-#                 print(f"  📝 摘要: {result.get('summary', '')[:50]}...")
-#             else:
-#                 fail_count += 1
-#                 print(f"  ❌ 更新数据库失败")
-            
-#             # 避免API限流
-#             if i < len(rows):
-#                 time.sleep(sleep_sec)
-        
-#         # # 统计结果
-#         # print(f"\n📊 分析完成统计:")
-#         # print(f"  ✅ 成功: {success_count}")
-#         # print(f"  ❌ 失败: {fail_count}")
-#         # print(f"  📝 总计: {len(rows)}")
-#         return {"total": len(rows), "success": success_count, "failed": fail_count}  # ⭐ 新增
-#     finally:
-#         conn.close()
 
 
-def get_analysis_stats():
-    """
-    查看分析统计信息
-    """
+def get_analysis_stats() -> dict:
+    """查看各状态的数据量统计"""
     conn = get_connection()
-    cursor = conn.cursor()
-    
-    # 各状态统计
-    cursor.execute("""
-        SELECT status, COUNT(*) as count 
-        FROM news 
-        WHERE is_duplicate = 0
-        GROUP BY status
-    """)
-    stats = {row[0]: row[1] for row in cursor.fetchall()}
-    
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT status, COUNT(*) AS count
+            FROM news
+            WHERE is_duplicate = 0
+            GROUP BY status
+        """)
+        stats = {row[0]: row[1] for row in cursor.fetchall()}
+    finally:
+        conn.close()
+
     print("\n📊 数据库统计:")
     print(f"  待采集 (raw): {stats.get('raw', 0)}")
     print(f"  已提取 (extracted): {stats.get('extracted', 0)}")
+    print(f"  已去重待分析 (deduped): {stats.get('deduped', 0)}")
     print(f"  已分析 (analyzed): {stats.get('analyzed', 0)}")
     print(f"  分析失败 (analyze_failed): {stats.get('analyze_failed', 0)}")
     print(f"  总计: {sum(stats.values())}")
-    
-    conn.close()
     return stats
 
 
 if __name__ == "__main__":
-    # 查看统计
     get_analysis_stats()
-    
-    # 运行分析（可以调整参数）
-    # run(sleep_sec=0.5, max_retry=2)     # 处理所有
-    # run(limit=10, sleep_sec=0.3)         # 只处理10条
-    run(sleep_sec=0.3, max_retry=3)
+    run(max_items=150, per_source_cap=30, max_retry=3)

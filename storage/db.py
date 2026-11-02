@@ -3,15 +3,17 @@ import json
 import os
 import sqlite3
 import threading
+import time
+from collections import Counter
 from pathlib import Path
 
 DB_PATH = Path(os.getenv("NEWS_DB_PATH", Path(__file__).parent / "news.db"))
 
-import json
-import time
-from collections import Counter
-
 DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
+
+# 读取摘要时优先用 LLM 摘要，没有则回退到原始摘要；
+# 别名仍叫 summary，所以前端 / 日报 / API 读到的字段名不变，无需改动
+_SUMMARY_EXPR = "COALESCE(NULLIF(llm_summary, ''), summary) AS summary"
 
 _init_lock = threading.Lock()
 _initialized = False
@@ -34,6 +36,7 @@ _SCHEMA = [
         crawl_time TEXT,
         content TEXT,
         summary TEXT,
+        llm_summary TEXT,
         llm_category TEXT,
         keywords TEXT,
         importance INTEGER,
@@ -94,6 +97,8 @@ _MIGRATIONS = [
     ("duplicate_of", "INTEGER"),
     ("extract_status", "TEXT"),
     ("extract_attempts", "INTEGER DEFAULT 0"),
+    ("llm_summary", "TEXT"),
+     ("embed_attempts", "INTEGER DEFAULT 0"), 
 ]
 
 
@@ -122,9 +127,22 @@ def init_db():
         for ddl in _SCHEMA:
             conn.execute(ddl)
         cols = {r[1] for r in conn.execute("PRAGMA table_info(news)")}
+        added = set()
         for name, ddl in _MIGRATIONS:
             if name not in cols:
                 conn.execute(f"ALTER TABLE news ADD COLUMN {name} {ddl}")
+                added.add(name)
+
+        # 一次性回填：旧版本把 LLM 摘要直接写进了 summary，
+        # 新增 llm_summary 列时，把已分析记录的 summary 复制过去，保证老数据不丢
+        if "llm_summary" in added:
+            marks = ",".join("?" * len(DONE_STATUSES))
+            conn.execute(
+                f"""UPDATE news SET llm_summary = summary
+                    WHERE llm_summary IS NULL AND status IN ({marks})""",
+                DONE_STATUSES,
+            )
+
         for ddl in _INDEXES:
             conn.execute(ddl)
         conn.commit()
@@ -203,7 +221,7 @@ def query_news(conn, category=None, keyword=None, min_importance=None, limit=20,
     statuses = (status,) if isinstance(status, str) else tuple(status)
     marks = ",".join("?" * len(statuses))
     sql = f"""
-        SELECT id, title, source, published, published_ts, summary,
+        SELECT id, title, source, published, published_ts, {_SUMMARY_EXPR},
                llm_category, keywords, importance, url, status
         FROM news
         WHERE is_duplicate = 0 AND status IN ({marks})
@@ -213,10 +231,12 @@ def query_news(conn, category=None, keyword=None, min_importance=None, limit=20,
         sql += " AND llm_category = ?"
         params.append(category)
     if keyword:
+        # 搜索同时覆盖 LLM 摘要和原始摘要
         sql += """ AND (title LIKE ? COLLATE NOCASE
                      OR summary LIKE ? COLLATE NOCASE
+                     OR llm_summary LIKE ? COLLATE NOCASE
                      OR keywords LIKE ? COLLATE NOCASE)"""
-        params += [f"%{keyword}%"] * 3
+        params += [f"%{keyword}%"] * 4
     if min_importance is not None:
         sql += " AND importance >= ?"
         params.append(min_importance)
@@ -232,12 +252,35 @@ def fetch_news_by_ids(conn, news_ids):
         return {}
     marks = ",".join("?" * len(news_ids))
     cur = conn.execute(
-        f"""SELECT id, title, source, published, summary, content,
+        f"""SELECT id, title, source, published, {_SUMMARY_EXPR}, content,
                    llm_category, keywords, importance, url
             FROM news WHERE id IN ({marks})""",
         news_ids,
     )
     return {d["id"]: d for d in _all_dicts(cur)}
+
+
+def fetch_important_recent(limit=8, min_importance=7, hours=24):
+    since = int(time.time()) - hours * 3600
+    ph = ",".join("?" * len(DONE_STATUSES))
+    conn = get_connection()
+    try:
+        rows = conn.execute(f"""
+            SELECT id, title, source, published, {_SUMMARY_EXPR},
+                   llm_category, importance, url
+            FROM news
+            WHERE is_duplicate = 0
+              AND importance >= ?
+              AND status IN ({ph})
+              AND published_ts >= ?
+            ORDER BY importance DESC, published_ts DESC
+            LIMIT ?
+        """, (min_importance, *DONE_STATUSES, since, limit)).fetchall()
+    finally:
+        conn.close()
+    keys = ["id", "title", "source", "published", "summary",
+            "llm_category", "importance", "url"]
+    return [dict(zip(keys, r)) for r in rows]
 
 
 # ============================================================
@@ -280,40 +323,10 @@ def table_exists(conn, table_name: str) -> bool:
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
     ).fetchone() is not None
 
-import time
 
-DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
-
-def fetch_important_recent(limit=8, min_importance=7, hours=24):
-    since = int(time.time()) - hours * 3600
-    ph = ",".join("?" * len(DONE_STATUSES))
-    conn = get_connection()
-    try:
-        rows = conn.execute(f"""
-            SELECT id, title, source, published, summary,
-                   llm_category, importance, url
-            FROM news
-            WHERE is_duplicate = 0
-              AND importance >= ?
-              AND status IN ({ph})
-              AND published_ts >= ?
-            ORDER BY importance DESC, published_ts DESC
-            LIMIT ?
-        """, (min_importance, *DONE_STATUSES, since, limit)).fetchall()
-    finally:
-        conn.close()
-    keys = ["id", "title", "source", "published", "summary",
-            "llm_category", "importance", "url"]
-    return [dict(zip(keys, r)) for r in rows]
-
-
-import json
-import time
-from collections import Counter
-
-DONE_STATUSES = ("analyzed", "embedded", "embed_failed", "clustered", "reported")
-
-
+# ============================================================
+# 趋势统计
+# ============================================================
 def fetch_trends(days: int = 30) -> dict:
     """过去 N 天趋势总览：统计数字、热门技术、每日数量、重要事件"""
     ph = ",".join("?" * len(DONE_STATUSES))
