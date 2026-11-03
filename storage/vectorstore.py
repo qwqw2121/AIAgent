@@ -1,4 +1,9 @@
 # storage/vectorstore.py
+"""
+LangChain 适配层，只用于 MCP / 检索。
+复用 embedding.vector_store 的同一个 client 和集合，不再单独建库。
+写入请统一走 embedding_task -> VectorStore.add_news。
+"""
 import os
 import sys
 from pathlib import Path
@@ -6,8 +11,9 @@ from dotenv import load_dotenv
 from langchain_chroma import Chroma
 from langchain_community.embeddings import DashScopeEmbeddings
 
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(dotenv_path=env_path)
+from embedding.vector_store import get_vector_store
+
+load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 EMBED_MODEL = str(os.getenv("LLM_EMBEDING", "text-embedding-v3")).strip()
 API_KEY = str(os.getenv("LLM_API_KEY", "")).strip()
@@ -15,40 +21,43 @@ API_KEY = str(os.getenv("LLM_API_KEY", "")).strip()
 if not API_KEY:
     raise ValueError("❌ 请在 .env 中配置 LLM_API_KEY")
 
-# 改：打印到 stderr，避免污染 MCP stdio 协议
+# 打印到 stderr，避免污染 MCP stdio 协议
 print(f"✅ Embedding 配置: Model={EMBED_MODEL} (DashScope)", file=sys.stderr)
 
-# 改：限制重试次数，避免网络抖动时卡十几秒
 embeddings = DashScopeEmbeddings(
     model=EMBED_MODEL,
     dashscope_api_key=API_KEY,
     max_retries=1,
 )
 
-PERSIST_DIR = os.getenv("VECTOR_DB_PATH", "storage/vector_db")
-vectorstore = Chroma(
-    collection_name="news_embeddings",
-    embedding_function=embeddings,
-    persist_directory=PERSIST_DIR,
-)
+_store = get_vector_store()
+
+
+def build_vectorstore() -> Chroma:
+    return Chroma(
+        client=_store.client,
+        collection_name=_store.collection.name,
+        embedding_function=embeddings,
+        collection_metadata={"hnsw:space": "cosine"},
+    )
+
+
+vectorstore = build_vectorstore()
 
 
 def upsert_news(news_id: int, title: str, summary: str, metadata: dict):
-    """将新闻写入向量库 (带严格空值拦截)"""
+    """写入向量库（保留兼容；正常流程应由 embedding_task 写入）"""
     safe_title = str(title).strip() if title is not None else "未知标题"
     safe_summary = str(summary).strip() if summary is not None else ""
-    text_to_embed = f"{safe_title}\n{safe_summary}".strip()
+    text = f"{safe_title}\n{safe_summary}".strip()
 
-    if not text_to_embed or text_to_embed.lower() in ["none", "none\nnone"]:
+    if not text or text.lower() in ["none", "none\nnone"]:
         print(f"⚠️ 拦截: ID={news_id} 的文本内容为空，跳过向量入库", file=sys.stderr)
         return
 
     try:
-        vectorstore.add_texts(
-            texts=[text_to_embed],
-            metadatas=[{**metadata, "news_id": news_id}],
-            ids=[str(news_id)],
-        )
+        emb = embeddings.embed_query(text)
+        _store.add_news(news_id, emb, text, {**metadata, "news_id": news_id})
     except Exception as e:
         print(f"❌ ID={news_id} 向量入库失败: {e}", file=sys.stderr)
         raise
@@ -56,12 +65,3 @@ def upsert_news(news_id: int, title: str, summary: str, metadata: dict):
 
 def get_retriever(k=5):
     return vectorstore.as_retriever(search_kwargs={"k": k})
-
-def build_vectorstore():
-    return Chroma(
-        collection_name="news_embeddings",
-        embedding_function=embeddings,
-        persist_directory=PERSIST_DIR,
-    )
-
-vectorstore = build_vectorstore()

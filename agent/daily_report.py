@@ -6,10 +6,13 @@ import time
 from datetime import date, datetime
 
 from dotenv import load_dotenv
-from openai import OpenAI
-
+from agent.llm_client import chat_json
 from storage.db import get_connection
 from pipeline.utils import day_bounds_ts, SQL_TZ
+from pipeline.config import (
+    MIN_NEWS_IMPORTANCE, MIN_EVENT_SIZE,
+    SINGLE_EVENT_MIN_IMPORTANCE, MIN_REPORT_EVENTS,
+)
 
 load_dotenv()
 
@@ -18,33 +21,21 @@ load_dotenv()
 # =========================================================
 get_db = get_connection
 
-MAX_EVENTS_PER_BATCH = 12       # 每批交给 LLM 的事件数（不是全天上限）
-MAX_NEWS_PER_EVENT = 8          # 每个事件带入 prompt 的新闻上限
-MAX_NEWS_SUMMARY_CHARS = 350    # 新闻摘要截断长度
+MAX_EVENTS_PER_BATCH = 4     # 每批交给 LLM 的事件数（不是全天上限）
+MAX_NEWS_PER_EVENT = 5          # 每个事件带入 prompt 的新闻上限
+MAX_NEWS_SUMMARY_CHARS = 250    # 新闻摘要截断长度
 MAX_LLM_ATTEMPTS = 3            # 单批 LLM 调用最大尝试次数
+MAX_REPORT_EVENTS = 12
 
-API_KEY = os.getenv("LLM_API_KEY")
-BASE_URL = os.getenv("LLM_BASE_URL")
-MODEL_NAME = os.getenv("LLM_ANALYSE")
-
-_client = None
-
-
-def _get_client() -> OpenAI:
-    """延迟初始化，避免 import 阶段因缺环境变量直接崩溃。"""
-    global _client
-    if not API_KEY:
-        raise RuntimeError("缺少环境变量 LLM_API_KEY")
-    if not MODEL_NAME:
-        raise RuntimeError("缺少环境变量 LLM_ANALYSE")
-    if _client is None:
-        _client = OpenAI(
-            api_key=API_KEY,
-            base_url=BASE_URL,
-            timeout=90,
-            max_retries=0,
-        )
-    return _client
+def _chat_json(prompt, system_prompt):
+    return chat_json(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        primary_env="LLM_DAILY_REPORT",
+        fallback_env="LLM_DAILY_REPORT_FALLBACKS",
+        temperature=0.2,
+        timeout=180,
+    )
 
 
 # =========================================================
@@ -73,7 +64,9 @@ def get_today_report_date() -> str:
 def get_events_by_date(report_date):
     """
     返回 (events, pending_news_ids)
-    events: 当天有 clustered/reported 新闻落入的事件，按当天新闻最高重要性排序
+    events: 当天有 clustered/reported 新闻落入的"成型事件"
+            （事件总新闻数 >= MIN_EVENT_SIZE，且新闻 importance > MIN_NEWS_IMPORTANCE），
+            按当天新闻最高重要性排序
     pending_news_ids: 本次输入中 status='clustered' 的新闻 id 集合
     """
     start_ts, end_ts = day_bounds_ts(report_date)
@@ -86,6 +79,7 @@ def get_events_by_date(report_date):
                 e.summary AS event_summary,
                 e.category,
                 e.keywords,
+                e.news_count AS total_news_count,
                 COALESCE(MAX(n.importance), 0) AS day_importance,
                 COUNT(DISTINCT n.id) AS day_news_count,
                 MAX(n.published_ts) AS day_last_published_ts
@@ -94,14 +88,28 @@ def get_events_by_date(report_date):
             JOIN news n ON n.id = en.news_id
             WHERE n.is_duplicate = 0
               AND n.status IN ('clustered', 'reported')
+              AND n.importance > ?
               AND n.published_ts >= ? AND n.published_ts < ?
             GROUP BY e.id
             ORDER BY day_importance DESC, day_news_count DESC,
                      day_last_published_ts DESC, e.id ASC
-        """, (start_ts, end_ts)).fetchall()
+        """, (MIN_NEWS_IMPORTANCE, start_ts, end_ts)).fetchall()
 
         if not event_rows:
             return [], set()
+
+        # 分层入选：多源事件 + 高分单条；不足时按重要性保底补齐
+        core = [
+            r for r in event_rows
+            if r["total_news_count"] >= MIN_EVENT_SIZE
+            or r["day_importance"] >= SINGLE_EVENT_MIN_IMPORTANCE
+        ]
+        if len(core) < MIN_REPORT_EVENTS:
+            core_ids = {r["event_id"] for r in core}
+            extra = [r for r in event_rows if r["event_id"] not in core_ids]
+            core += extra[:MIN_REPORT_EVENTS - len(core)]   # event_rows 已按重要性排序
+        keep = {r["event_id"] for r in core}
+        event_rows = [r for r in event_rows if r["event_id"] in keep][:MAX_REPORT_EVENTS]
 
         event_ids = [int(r["event_id"]) for r in event_rows]
         marks = ",".join("?" * len(event_ids))
@@ -122,12 +130,13 @@ def get_events_by_date(report_date):
             WHERE en.event_id IN ({marks})
               AND n.is_duplicate = 0
               AND n.status IN ('clustered', 'reported')
+              AND n.importance > ?
               AND n.published_ts >= ? AND n.published_ts < ?
             ORDER BY en.event_id,
                      COALESCE(n.importance, 0) DESC,
                      n.published_ts DESC,
                      n.id ASC
-        """, (*event_ids, start_ts, end_ts)).fetchall()
+        """, (*event_ids, MIN_NEWS_IMPORTANCE, start_ts, end_ts)).fetchall()
 
         news_by_event = {eid: [] for eid in event_ids}
         pending_news_ids = set()
@@ -226,21 +235,6 @@ JSON 格式：
 """.strip()
 
 
-# =========================================================
-# 解析与校验
-# =========================================================
-def _parse_json(content):
-    if not isinstance(content, str) or not content.strip():
-        raise ValueError("LLM 返回内容为空")
-    content = content.strip()
-    content = re.sub(r"^```(?:json)?\s*", "", content, flags=re.IGNORECASE)
-    content = re.sub(r"\s*```$", "", content)
-    value = json.loads(content)
-    if not isinstance(value, dict):
-        raise ValueError("LLM 返回的 JSON 顶层必须是对象")
-    return value
-
-
 def _to_int(value):
     if isinstance(value, bool):
         raise ValueError("bool 不能作为 ID")
@@ -321,20 +315,6 @@ def _normalize_batch(raw, input_events):
     return normalized
 
 
-def _chat_json(prompt, system_prompt):
-    client = _get_client()
-    resp = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": prompt},
-        ],
-        response_format={"type": "json_object"},
-        temperature=0.2,
-    )
-    if not resp.choices:
-        raise ValueError("LLM 返回空 choices")
-    return _parse_json(resp.choices[0].message.content)
 
 
 def _generate_event_batch(events, report_date):
@@ -390,13 +370,24 @@ def generate_daily_report(events, report_date):
         return {"overview": "今天暂无可用的 AI 科技事件。", "events": []}
 
     all_results = []
+    failed_batches = 0
     total = len(events)
     total_batches = (total + MAX_EVENTS_PER_BATCH - 1) // MAX_EVENTS_PER_BATCH
     for start in range(0, total, MAX_EVENTS_PER_BATCH):
         batch = events[start:start + MAX_EVENTS_PER_BATCH]
         batch_no = start // MAX_EVENTS_PER_BATCH + 1
         print(f"  生成事件批次 {batch_no}/{total_batches}，事件数={len(batch)}", flush=True)
-        all_results.extend(_generate_event_batch(batch, report_date))
+        try:
+            all_results.extend(_generate_event_batch(batch, report_date))
+        except Exception as e:
+            failed_batches += 1
+            print(f"  [批次 {batch_no}] 放弃: {e}", flush=True)
+
+    if not all_results:
+        raise RuntimeError("所有批次均失败，未生成日报")
+
+    if failed_batches:
+        print(f"  ⚠️ {failed_batches}/{total_batches} 个批次失败，日报将缺少部分事件", flush=True)
 
     overview = _generate_overview(report_date, all_results)
     return {"overview": overview, "events": all_results}
@@ -473,25 +464,52 @@ def save_daily_report(report_date, report, pending_news_ids):
     finally:
         conn.close()
 
+def mark_day_reported(report_date) -> int:
+    """
+    把当天所有符合条件的 clustered 新闻标为 reported。
+    用于日报加了展示上限后，被截掉的事件的新闻也不会永远停在 clustered。
+    """
+    start_ts, end_ts = day_bounds_ts(report_date)
+    conn = get_db()
+    try:
+        cur = conn.execute("""
+            UPDATE news SET status = 'reported'
+            WHERE status = 'clustered'
+              AND is_duplicate = 0
+              AND published_ts >= ? AND published_ts < ?
+        """, (start_ts, end_ts))
+        conn.commit()
+        return cur.rowcount
+    finally:
+        conn.close()
 
 # =========================================================
 # 待生成日期 / 已有日报
 # =========================================================
 def find_pending_dates(limit=10, oldest_first=True):
+    """
+    有"成型事件中的 clustered 新闻"的日期。
+    条件必须和 get_events_by_date 保持一致，否则会出现
+    "有待处理日期但取不到事件"的死循环。
+    """
     order = "ASC" if oldest_first else "DESC"
     conn = get_db()
     try:
         rows = conn.execute(f"""
             SELECT date(n.published_ts, 'unixepoch', '{SQL_TZ}') AS d, COUNT(*)
             FROM news n
+            JOIN event_news en ON en.news_id = n.id
+            JOIN events e ON e.id = en.event_id
             WHERE n.status = 'clustered'
               AND n.is_duplicate = 0
               AND n.published_ts IS NOT NULL
-              AND EXISTS (SELECT 1 FROM event_news en WHERE en.news_id = n.id)
+              AND n.importance > ?
+              AND (e.news_count >= ? OR n.importance >= ?)
             GROUP BY d
             ORDER BY d {order}
             LIMIT ?
-        """, (limit,)).fetchall()
+        """, (MIN_NEWS_IMPORTANCE, MIN_EVENT_SIZE,
+              SINGLE_EVENT_MIN_IMPORTANCE, limit)).fetchall()
         return [r[0] for r in rows if r[0] is not None]
     finally:
         conn.close()
@@ -543,7 +561,15 @@ def create_daily_report(report_date=None, force=False):
 
     report = generate_daily_report(events, report_date)
     report = attach_news_info(report, events)
-    marked = save_daily_report(report_date, report, pending_news_ids)
+
+    # 只标记成功生成的事件里的新闻
+    done_event_ids = {e["event_id"] for e in report["events"]}
+    done_news_ids = {
+        n["id"] for ev in events if ev["event_id"] in done_event_ids for n in ev["news"]
+    }
+    marked = save_daily_report(report_date, report, pending_news_ids & done_news_ids)
+
+    # marked += mark_day_reported(report_date)
 
     print(f"[日报生成成功] {report_date}，事件={len(report['events'])}，标记新闻={marked}", flush=True)
     return report

@@ -18,7 +18,6 @@ load_dotenv()
 
 from langgraph.graph import StateGraph, END, MessagesState
 from langgraph.prebuilt import ToolNode
-from langchain_openai import ChatOpenAI
 from langchain_core.messages import (
     SystemMessage, HumanMessage, AIMessage, ToolMessage, trim_messages,
 )
@@ -37,17 +36,9 @@ except ImportError:
 # ============================================================
 # 1. LLM 配置
 # ============================================================
-# 改：加超时/重试上限；关闭思考模式（路由+总结不需要推理，能省大量时间）
-_base_llm = ChatOpenAI(
-    model=os.getenv("LLM_MODEL"),
-    openai_api_key=os.getenv("LLM_API_KEY"),
-    base_url=os.getenv("LLM_BASE_URL"),
-    timeout=40,
-    max_retries=1,
-    streaming=True,
-    extra_body={"enable_thinking": False},
-)
-agent_llm = _base_llm
+from agent.llm_client import get_chat_model
+
+agent_llm = None
 
 MCP_SCRIPT_PATH = os.path.abspath(
     os.path.join(os.path.dirname(__file__), "../mcp_server/news_mcp.py")
@@ -345,7 +336,14 @@ async def init_agent():
     SEARCH_TOOLS, REPORT_TOOLS = _split_tools_by_group(TOOLS)
     print(f"✅ 加载工具: {[t.name for t in TOOLS]}")
 
-    agent_llm = _base_llm.bind_tools(TOOLS)
+    agent_llm = get_chat_model(
+    primary_env="LLM_MODEL",
+    fallback_env="LLM_MODEL_FALLBACKS",
+    timeout=40,
+    streaming=True,
+    enable_thinking=False,
+    tools=TOOLS,
+)
 
     checkpointer = await _make_async_checkpointer()
     app = build_graph(checkpointer)

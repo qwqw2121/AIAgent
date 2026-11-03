@@ -1,9 +1,10 @@
-from datetime import date, datetime, time, timedelta, timezone
+from datetime import date, datetime, timezone
 from enum import Enum
-from typing import Optional
-from pydantic import BaseModel, Field
-from pydantic import BaseModel, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from pipeline.utils import day_bounds_ts
+
 
 class NewsStatus(str, Enum):
     RAW = "raw"
@@ -16,6 +17,7 @@ class NewsStatus(str, Enum):
     EMBEDDED = "embedded"
     EMBED_FAILED = "embed_failed"
     CLUSTERED = "clustered"
+    UNCLUSTERED = "unclustered"   # 已聚类阶段处理，但未归入任何成型事件（低重要性或小事件过期）
     REPORTED = "reported"
 
 

@@ -13,15 +13,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from textwrap import dedent
 from threading import Lock
 from typing import Any, Dict, Optional
-
+from agent.llm_client import chat_json
 from dotenv import load_dotenv
 
 from storage.db import get_connection, update_fields
-
-try:
-    from openai import OpenAI
-except ImportError as e:
-    raise ImportError("缺少依赖 openai，请先安装：pip install openai") from e
 
 load_dotenv()
 
@@ -36,17 +31,6 @@ REQUEST_TIMEOUT = 60          # 单次请求超时（秒）
 BATCH_COMMIT = 15             # 每处理多少条提交一次数据库
 
 CATEGORIES = {"大模型发布", "融资并购", "政策监管", "研究论文", "产品发布", "行业观点", "其他"}
-
-API_KEY = os.getenv("LLM_API_KEY")
-BASE_URL = os.getenv("LLM_BASE_URL")
-MODEL_NAME = os.getenv("LLM_ANALYSE")
-
-for _name, _val in [("LLM_API_KEY", API_KEY), ("LLM_BASE_URL", BASE_URL), ("LLM_ANALYSE", MODEL_NAME)]:
-    if not _val:
-        raise RuntimeError(f"缺少环境变量 {_name}，请检查 .env 文件")
-
-# max_retries=0：重试由本文件自己控制，避免和 SDK 内部重试叠加
-client = OpenAI(api_key=API_KEY, base_url=BASE_URL, timeout=REQUEST_TIMEOUT, max_retries=0)
 
 
 # ============================================================
@@ -106,13 +90,14 @@ def analyze_news(title: str, content: str) -> dict:
         - 严禁逐句改写原文表述，要用你自己的语言重新组织信息
         """)
 
-    response = client.chat.completions.create(
-        model=MODEL_NAME,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=0.3,
-    )
-    return json.loads(response.choices[0].message.content)
+    return chat_json(
+    prompt=prompt,
+    primary_env="LLM_ANALYSE",
+    fallback_env="LLM_ANALYSE_FALLBACKS",
+    temperature=0.3,
+    timeout=REQUEST_TIMEOUT,
+    before_request=_rate_limiter.wait,
+)
 
 
 def _normalize(result: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,7 +135,6 @@ def _analyze_one(row: dict, max_retry: int):
 
     for attempt in range(max_retry + 1):
         try:
-            _rate_limiter.wait()
             result = analyze_news(row["title"], content)
             break
         except Exception as e:

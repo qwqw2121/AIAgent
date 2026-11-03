@@ -3,6 +3,7 @@ from prefect import task, get_run_logger
 from embedding.incremental_event import run as incremental_cluster_run
 from pipeline.state import PipelineState
 
+
 @task(name="incremental-clustering", retries=1)
 def clustering_task(state: PipelineState) -> PipelineState:
     logger = get_run_logger()
@@ -12,7 +13,14 @@ def clustering_task(state: PipelineState) -> PipelineState:
     state.stage_stats["clustering"] = stats
     logger.info(
         f"增量聚类: 处理{stats['total']}条, 新建事件{stats['new_events']}, "
-        f"归入已有{stats['joined_existing']}, 失败{stats['failed']}"
+        f"归入已有{stats['joined_existing']}, "
+        f"低重要性跳过{stats.get('skipped_low_importance', 0)}, "
+        f"失败{stats['failed']}"
+    )
+    logger.info(
+        f"小事件处理: 并入{stats.get('merged_singletons', 0)}, "
+        f"保留{stats.get('kept_singletons', 0)}, "
+        f"过期释放{stats.get('released_stale', 0)}"
     )
     if stats["failed"] > 0:
         state.errors.append(f"clustering: {stats['failed']} 条处理失败")

@@ -44,7 +44,7 @@ def quality_check_task(report_date: str):
         r = run_quality_check(report_date)
         if r.get("status") == "warn":
             logger.warning(
-                f"⚠️ 日报质量告警 {report_date}: 疑似误并事件 {r['flagged']} 个，不相关新闻 {r['irrelevant']} 条"
+                f"⚠️ 日报质量告警 {report_date}: {r['flagged']} 个事件存在疑点"
             )
             for it in r["issues"]:
                 logger.warning(f"  - {it['title']}: {'; '.join(it['reasons'])}")
@@ -126,7 +126,8 @@ def daily_flow(run_date: date = None):
 
 
 if __name__ == "__main__":
+    daily_flow("2026-09-09")
 
-    daily_flow(
-        run_date=date.today() - timedelta(days=1)
-    )
+    # daily_flow(
+    #     run_date=date.today() - timedelta(days=1)
+    # )

@@ -4,18 +4,27 @@
 
 逻辑：
 1. 按发布时间顺序处理 status='embedded' 且未去重的新闻
-2. 对每条新闻，在向量库中找最近邻（先 30 条，不够再扩大到 90）
-3. 在时间窗口 [published_ts - JOIN_WINDOW_DAYS, published_ts] 内，
+2. importance <= MIN_NEWS_IMPORTANCE 的新闻不参与聚类，直接标记为 'unclustered'
+3. 对每条新闻，在向量库中找最近邻（先 30 条，不够再扩大到 90）
+4. 在时间窗口 [published_ts - JOIN_WINDOW_DAYS, published_ts] 内，
    找已经归属事件的近邻，取相似度最高的事件加入
-4. 找不到则创建新事件
-5. 更新事件统计信息与代表新闻
-6. 主聚类完成后，把单条事件尝试并入成型事件，减少碎片事件
+5. 找不到则创建新事件（此时是 1 条的"候选事件"，等待后续新闻并入）
+6. 更新事件统计信息与代表新闻
+7. 主聚类完成后，把单条事件并入附近已有 >=2 条新闻的事件
+8. 最后释放过期的小事件：超出时间窗口、再也等不到新邻居、仍不足
+   MIN_EVENT_SIZE 条的事件，其新闻标记为 'unclustered'，不再等待
+
+注意：事件表中允许存在 <MIN_EVENT_SIZE 条的候选事件，
+日报和前端只应展示 news_count >= MIN_EVENT_SIZE 的事件。
 """
 
 from typing import NamedTuple, Optional
 
 from storage.db import get_connection
-from embedding.vector_store import VectorStore
+from embedding.vector_store import get_vector_store
+from pipeline.config import (
+    MIN_NEWS_IMPORTANCE, MIN_EVENT_SIZE, SINGLE_EVENT_MIN_IMPORTANCE,
+)
 
 
 # =========================================================
@@ -27,12 +36,10 @@ N_RESULTS = 30                  # 第一次近邻查询数量
 N_RESULTS_EXPANDED = 90         # 第一次没找到已归属事件时，扩大查询
 JOIN_WINDOW_DAYS = 3            # 向前看多少天的已有事件
 
-MIN_EVENT_SIZE = 2              # 成型事件至少包含多少条新闻
-MERGE_THRESHOLD = 0.65          # 单条事件并入成型事件的相似度阈值
+MERGE_THRESHOLD = 0.65          # 单条事件并入其他事件的相似度阈值
+MERGE_TARGET_MIN_SIZE = 1       # 并入目标至少已有 2 条（并入后即达到 3 条）
 
-EMBEDDING_BATCH_SIZE = 500      # 批量获取 embedding 的分批大小
-
-vector_store = VectorStore()
+vector_store = get_vector_store()
 
 
 # =========================================================
@@ -162,7 +169,7 @@ def _refresh_representative(conn, event_id: int) -> None:
 
 
 def _create_event(conn, news_id: int) -> Optional[int]:
-    """用一条新闻创建新事件，并设为代表"""
+    """用一条新闻创建新事件（候选事件），并设为代表"""
     row = conn.execute("""
         SELECT title, summary, llm_category, keywords, importance, published
         FROM news
@@ -202,10 +209,15 @@ def _create_event(conn, news_id: int) -> Optional[int]:
 # 向量近邻查询
 # =========================================================
 
-def _query_sims(news_id: int, embedding: list, n_results: int) -> dict[int, float]:
+def _query_sims(
+    news_id: int,
+    embedding: list,
+    n_results: int,
+    threshold: float = EVENT_THRESHOLD,
+) -> dict[int, float]:
     """
     在向量库中查询近邻，返回 {news_id: similarity}。
-    只保留相似度 >= EVENT_THRESHOLD 且不是自己的结果。
+    只保留相似度 >= threshold 且不是自己的结果。
     """
     result = vector_store.collection.query(
         query_embeddings=[embedding],
@@ -223,7 +235,7 @@ def _query_sims(news_id: int, embedding: list, n_results: int) -> dict[int, floa
         if sid == news_id:
             continue
         similarity = _dist_to_similarity(dist, space)
-        if similarity >= EVENT_THRESHOLD:
+        if similarity >= threshold:
             sims[sid] = similarity
 
     return sims
@@ -274,10 +286,6 @@ def _best_candidate(conn, news_id: int, published_ts: int) -> Candidate:
                 similarity=sims[best_news_id],
             )
 
-        # 第一次没找到已归属事件，扩大到 N_RESULTS_EXPANDED 再试一次
-        if n == N_RESULTS:
-            continue
-
     return Candidate(kind="new")
 
 
@@ -287,106 +295,66 @@ def _best_candidate(conn, news_id: int, published_ts: int) -> Candidate:
 
 def _merge_singletons(conn, start_ts: Optional[int] = None, end_ts: Optional[int] = None) -> dict:
     """
-    把 news_count < MIN_EVENT_SIZE 的事件尝试并入成型事件。
-    只并入 news_count >= MIN_EVENT_SIZE 的事件，相似度 >= MERGE_THRESHOLD。
+    把只有 1 条新闻的事件，并入时间窗口内已有 >= MERGE_TARGET_MIN_SIZE 条新闻的事件。
+    相似度 >= MERGE_THRESHOLD。
+    用向量库近邻查询代替全量取 embedding，避免 O(N*M) 的 Python 计算。
     """
     sql = """
-        SELECT e.id, en.news_id
+        SELECT e.id, en.news_id, n.published_ts
         FROM events e
         JOIN event_news en ON en.event_id = e.id
-        WHERE e.news_count < ?
+        JOIN news n ON n.id = en.news_id
+        WHERE e.news_count = 1
     """
-    params: list = [MIN_EVENT_SIZE]
+    params: list = []
 
     if start_ts is not None:
-        sql += """
-          AND en.news_id IN (
-              SELECT id FROM news WHERE published_ts >= ? AND published_ts < ?
-          )
-        """
+        sql += " AND n.published_ts >= ? AND n.published_ts < ?"
         params.extend([start_ts, end_ts])
 
     singles = conn.execute(sql, params).fetchall()
 
     merged = 0
     kept = 0
-    space = _space()
+    window = JOIN_WINDOW_DAYS * 86400
 
-    for event_id, news_id in singles:
-        exists = conn.execute("SELECT 1 FROM events WHERE id = ?", (event_id,)).fetchone()
-        if not exists:
+    for event_id, news_id, pts in singles:
+        # 前面的循环可能已经改动过这个事件，重新确认
+        cnt = conn.execute(
+            "SELECT news_count FROM events WHERE id = ?", (event_id,)
+        ).fetchone()
+        if not cnt or cnt[0] != 1 or pts is None:
             continue
 
-        source_embedding = _get_embedding(news_id)
-        if source_embedding is None:
+        emb = _get_embedding(news_id)
+        if emb is None:
             kept += 1
             continue
 
-        candidates = conn.execute("""
-            SELECT DISTINCT en.event_id
-            FROM event_news en
-            JOIN events e ON e.id = en.event_id
-            WHERE en.event_id != ?
-              AND e.news_count >= ?
-        """, (event_id, MIN_EVENT_SIZE)).fetchall()
-
-        if not candidates:
+        sims = _query_sims(news_id, emb, N_RESULTS_EXPANDED, threshold=MERGE_THRESHOLD)
+        if not sims:
             kept += 1
             continue
 
-        candidate_event_ids = [int(r[0]) for r in candidates]
-        marks = ",".join("?" * len(candidate_event_ids))
-
-        news_rows = conn.execute(f"""
+        marks = ",".join("?" * len(sims))
+        rows = conn.execute(f"""
             SELECT en.news_id, en.event_id
             FROM event_news en
             JOIN news n ON n.id = en.news_id
-            WHERE en.event_id IN ({marks})
-              AND n.published_ts IS NOT NULL
-        """, candidate_event_ids).fetchall()
+            JOIN events e ON e.id = en.event_id
+            WHERE en.news_id IN ({marks})
+              AND en.event_id != ?
+              AND e.news_count >= ?
+              AND n.published_ts BETWEEN ? AND ?
+        """, (*sims.keys(), event_id, MERGE_TARGET_MIN_SIZE,
+              pts - window, pts + window)).fetchall()
 
-        candidate_news = {int(nid): int(eid) for nid, eid in news_rows}
-        candidate_ids = list(candidate_news.keys())
-
-        best_event_id = None
-        best_similarity = -1.0
-
-        for start in range(0, len(candidate_ids), EMBEDDING_BATCH_SIZE):
-            batch = candidate_ids[start:start + EMBEDDING_BATCH_SIZE]
-            res = vector_store.collection.get(
-                ids=[str(i) for i in batch],
-                include=["embeddings"],
-            )
-            ids = res.get("ids") or []
-            embs = res.get("embeddings")
-            if embs is None:
-                continue
-            for sid, emb in zip(ids, embs):
-                similarity = _dist_to_similarity(
-                    vector_store.collection.query(
-                        query_embeddings=[source_embedding],
-                        n_results=1,
-                    )["distances"][0][0],
-                    space,
-                ) if False else None  # 占位，下面用 cosine 直接算
-                # 直接用余弦相似度计算，避免额外 query
-                try:
-                    similarity = _cosine(source_embedding, emb)
-                except Exception:
-                    continue
-                if similarity is None or similarity < MERGE_THRESHOLD:
-                    continue
-                cid = int(sid)
-                eid = candidate_news.get(cid)
-                if eid is None:
-                    continue
-                if similarity > best_similarity:
-                    best_similarity = similarity
-                    best_event_id = eid
-
-        if best_event_id is None:
+        if not rows:
             kept += 1
             continue
+
+        best_news_id, best_event_id = max(rows, key=lambda r: sims[r[0]])
+        best_similarity = sims[best_news_id]
 
         conn.execute("""
             UPDATE event_news
@@ -394,11 +362,8 @@ def _merge_singletons(conn, start_ts: Optional[int] = None, end_ts: Optional[int
             WHERE news_id = ? AND event_id = ?
         """, (best_event_id, best_similarity, news_id, event_id))
 
-        remain = conn.execute(
-            "SELECT COUNT(*) FROM event_news WHERE event_id = ?", (event_id,)
-        ).fetchone()[0]
-        if remain == 0:
-            conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+        # 单条事件的唯一新闻已移走，事件必为空
+        conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
 
         _update_event(conn, best_event_id)
         _refresh_representative(conn, best_event_id)
@@ -408,15 +373,40 @@ def _merge_singletons(conn, start_ts: Optional[int] = None, end_ts: Optional[int
     return {"merged": merged, "kept": kept}
 
 
-def _cosine(a, b) -> Optional[float]:
-    if a is None or b is None or len(a) != len(b):
-        return None
-    dot = sum(float(x) * float(y) for x, y in zip(a, b))
-    norm_a = sum(float(x) ** 2 for x in a) ** 0.5
-    norm_b = sum(float(y) ** 2 for y in b) ** 0.5
-    if norm_a == 0 or norm_b == 0:
-        return None
-    return dot / (norm_a * norm_b)
+# =========================================================
+# 释放过期的小事件
+# =========================================================
+
+def _release_stale_small_events(conn, end_ts: Optional[int]) -> int:
+    """
+    小事件（news_count < MIN_EVENT_SIZE）如果最新一条新闻已超出时间窗口，
+    之后的新闻不可能再并入它，其新闻标记为 'unclustered'，不再停留在 clustered。
+    返回释放的新闻条数。
+    """
+    if end_ts is None:
+        return 0
+
+    cutoff = end_ts - JOIN_WINDOW_DAYS * 86400
+    cur = conn.execute("""
+        UPDATE news
+        SET status = 'unclustered'
+        WHERE status = 'clustered'
+          AND id IN (
+              SELECT en.news_id
+              FROM event_news en
+              JOIN events e ON e.id = en.event_id
+              WHERE e.news_count < ?
+                AND e.importance < ?
+                AND (
+                    SELECT MAX(n2.published_ts)
+                    FROM event_news en2
+                    JOIN news n2 ON n2.id = en2.news_id
+                    WHERE en2.event_id = e.id
+                ) < ?
+          )
+    """, (MIN_EVENT_SIZE, SINGLE_EVENT_MIN_IMPORTANCE, cutoff))
+    conn.commit()
+    return cur.rowcount
 
 
 # =========================================================
@@ -427,7 +417,8 @@ def process_news(conn, news_id: int) -> tuple[Optional[int], str]:
     """
     对单篇新闻做事件聚类。
     返回 (event_id, kind)
-    kind 可能值：existing / joined / new / no_embedding / invalid_published / create_failed
+    kind 可能值：existing / joined / new / low_importance /
+                 no_embedding / invalid_published / insert_failed / create_failed
     """
     conn.execute("BEGIN IMMEDIATE")
 
@@ -441,14 +432,21 @@ def process_news(conn, news_id: int) -> tuple[Optional[int], str]:
         return row[0], "existing"
 
     row = conn.execute(
-        "SELECT published_ts FROM news WHERE id = ?",
+        "SELECT published_ts, importance FROM news WHERE id = ?",
         (news_id,),
     ).fetchone()
     if not row or row[0] is None:
         conn.rollback()
         return None, "invalid_published"
 
-    published_ts = row[0]
+    published_ts, importance = row
+
+    # 不够重要：不参与聚类，标记为终态，避免反复处理
+    if importance is None or importance <= MIN_NEWS_IMPORTANCE:
+        conn.execute("UPDATE news SET status = 'unclustered' WHERE id = ?", (news_id,))
+        conn.commit()
+        return None, "low_importance"
+
     cand = _best_candidate(conn, news_id, published_ts)
 
     if cand.kind == "no_embedding":
@@ -521,7 +519,7 @@ def run(start_ts: Optional[int] = None, end_ts: Optional[int] = None) -> dict:
 
         news_ids = [r[0] for r in conn.execute(sql, params)]
 
-        new_events = joined = existing = failed = 0
+        new_events = joined = existing = skipped = failed = 0
 
         for news_id in news_ids:
             try:
@@ -532,6 +530,8 @@ def run(start_ts: Optional[int] = None, end_ts: Optional[int] = None) -> dict:
                     joined += 1
                 elif kind == "existing":
                     existing += 1
+                elif kind == "low_importance":
+                    skipped += 1
                 else:
                     failed += 1
             except Exception as e:
@@ -540,14 +540,17 @@ def run(start_ts: Optional[int] = None, end_ts: Optional[int] = None) -> dict:
                 print(f"[聚类失败] news_id={news_id}: {e}", flush=True)
 
         merge_stats = _merge_singletons(conn, start_ts, end_ts)
+        released = _release_stale_small_events(conn, end_ts)
 
         result = {
             "total": len(news_ids),
             "new_events": new_events,
             "joined_existing": joined + existing,
+            "skipped_low_importance": skipped,
             "failed": failed,
             "merged_singletons": merge_stats["merged"],
             "kept_singletons": merge_stats["kept"],
+            "released_stale": released,
         }
         print(f"[事件聚类完成] {result}", flush=True)
         return result
