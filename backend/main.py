@@ -1,38 +1,29 @@
 # backend/main.py
 import sys
 import os  
-import json
 from pathlib import Path
 # 添加项目根目录到 sys.path（而不是 backend 目录）
 ROOT_DIR = Path(__file__).parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from datetime import  datetime
+import uvicorn
 from contextlib import asynccontextmanager
-from typing import Optional
-from backend.deps import get_db
-import uuid
-
-from fastapi import FastAPI, Depends, HTTPException, Query
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from langchain_core.messages import HumanMessage
+
 
 from storage.db import (
     DB_PATH,
-    get_connection,
     init_db,
-    fetch_report_by_date,
-    fetch_reports_range,
-    fetch_news_by_ids,
 )
 from backend.api.news import router as news_router
 from backend.api.dashboard import router as dashboard_router
 from backend.api.sources import router as sources_router
 from backend.api.events import router as events_router
-
 from backend.api.trends import router as trend_router
+from backend.api.chat import router as chat_router
+from backend.api.daily_reports import router as daily_reports_router
 
 # ============================================================
 # lifespan：启动时初始化 Agent（MCP stdio 连接 + 编译图，只做一次）
@@ -42,7 +33,6 @@ from fastapi.responses import StreamingResponse
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # 建索引（幂等）
-
     try:
         from agent.graph import init_agent
         app.state.agent = await init_agent()
@@ -89,56 +79,8 @@ app.include_router(sources_router)
 app.include_router(events_router)
 app.include_router(trend_router)
 app.include_router(news_router)
-
-
-def enrich_report_news(conn, report):
-    """Use the stored news records to provide readable details for each event."""
-    if not isinstance(report, dict):
-        return report
-
-    events = report.get("events", [])
-    if not isinstance(events, list):
-        return report
-
-    news_ids = {
-        news_id
-        for event in events
-        if isinstance(event, dict)
-        for news_id in event.get("news_ids", [])
-        if isinstance(news_id, int)
-    }
-    news_by_id = fetch_news_by_ids(conn, news_ids)
-
-    for event in events:
-        if not isinstance(event, dict):
-            continue
-        event["news"] = [
-            news_by_id[news_id]
-            for news_id in event.get("news_ids", [])
-            if news_id in news_by_id
-        ]
-
-    return report
-
-
-def report_response(conn, report_row):
-    """把日报记录转为响应结构（enrich 复用同一个连接）"""
-    report = enrich_report_news(conn, json.loads(report_row["report_json"]))
-    return {
-        "date": report_row["report_date"],
-        "overview": report_row["overview"],
-        "report": report,
-    }
-
-
-def _validate_date(d: str):
-    try:
-        datetime.strptime(d, "%Y-%m-%d")
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="日期格式错误，请使用 YYYY-MM-DD 格式"
-        )
+app.include_router(chat_router)
+app.include_router(daily_reports_router)
 
 
 @app.get("/")
@@ -154,147 +96,6 @@ def health():
             "db_path": str(DB_PATH),
             "agent_ready": bool(getattr(app.state, "agent", None))}
 
-
-# ============================================================
-#  问答入口
-# ============================================================
-class AskRequest(BaseModel):
-    question: str = Field(..., min_length=1, description="用户问题")
-    session_id: Optional[str] = Field(None, description="会话 ID，可选，便于前端追踪")
-
-@app.post("/api/ask")
-async def ask(req: AskRequest):
-    agent = getattr(app.state, "agent", None)
-    if agent is None:
-        raise HTTPException(503, "问答 Agent 未初始化")
-    config = {"configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
-              "recursion_limit": 15}
-    try:
-        result = await agent.ainvoke({"messages": [HumanMessage(content=req.question)]}, config=config)
-    except Exception as e:
-        raise HTTPException(500, f"Agent 调用失败: {e}")
-    return {"question": req.question, "session_id": req.session_id,
-            "answer": result["messages"][-1].content}
-
-from fastapi import Request
-
-@app.post("/api/chat")
-async def chat(req: AskRequest, request: Request):
-    """Stream agent tokens and tool activity as Server-Sent Events."""
-    agent = getattr(app.state, "agent", None)
-    if agent is None:
-        raise HTTPException(status_code=503, detail="问答 Agent 未初始化，请检查 MCP 服务配置")
-
-    config = {
-        "configurable": {"thread_id": req.session_id or str(uuid.uuid4())},
-        "recursion_limit": 10,
-    }
-
-    def sse(obj: dict) -> str:
-        return f"data: {json.dumps(obj, ensure_ascii=False)}\n\n"
-
-    async def event_stream():
-        yield sse({"type": "tool", "name": ""})   # 立刻给前端一个"处理中"状态
-        try:
-            async for event in agent.astream_events(
-                {"messages": [HumanMessage(content=req.question)]},
-                config=config,
-                version="v2",
-            ):
-                if await request.is_disconnected():   # 前端点了停止/断开，立即终止
-                    break
-
-                event_type = event.get("event")
-                metadata = event.get("metadata") or {}
-
-                if event_type == "on_chat_model_stream" and metadata.get("langgraph_node") == "agent":
-                    chunk = event.get("data", {}).get("chunk")
-                    if getattr(chunk, "tool_call_chunks", None):
-                        continue                        # 跳过"决定调用工具"那一轮
-                    content = getattr(chunk, "content", "")
-                    if content:
-                        yield sse({"type": "token", "content": content})
-                elif event_type == "on_tool_start":
-                    yield sse({"type": "tool", "name": event.get("name", "")})
-            yield "data: [DONE]\n\n"
-        except Exception as error:
-            yield sse({"type": "error", "content": f"{type(error).__name__}: {error}"})
-
-    return StreamingResponse(
-        event_stream(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache, no-transform",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
-    )
-
-# ============================================================
-#  日报接口
-#  ⚠️ 顺序要求：静态路径(today/range) 必须在 动态路径({report_date}) 之前，
-#     否则 /today 会被 {report_date} 抢先匹配，报 "日期格式错误"。
-# ============================================================
-
-from datetime import datetime, timezone, timedelta
-
-@app.get("/api/daily-report/today")
-def get_today_daily_report(conn=Depends(get_db)):
-    d = datetime.now(timezone.utc).date().isoformat()
-    row = fetch_report_by_date(conn, d)
-    if not row:
-        raise HTTPException(404, "今日日报尚未生成")
-    return report_response(conn, row)
-
-@app.get("/api/daily-report/latest")
-def get_latest_daily_report(conn=Depends(get_db)):
-    row = conn.execute(
-        "SELECT * FROM daily_reports ORDER BY report_date DESC LIMIT 1"
-    ).fetchone()
-    if not row:
-        raise HTTPException(404, "暂无日报")
-    return report_response(conn, row)
-
-# 2. 静态：日期范围
-@app.get("/api/daily-report/range")
-def get_daily_report_range(
-    start_date: str = Query(..., description="开始日期 YYYY-MM-DD"),
-    end_date: str = Query(..., description="结束日期 YYYY-MM-DD"),
-    conn=Depends(get_db),
-):
-    """获取日期范围内已经生成的日报。"""
-    _validate_date(start_date)
-    _validate_date(end_date)
-    rows = fetch_reports_range(conn, start_date, end_date)
-    return [report_response(conn, row) for row in rows]
-
-@app.get("/api/daily-report/index")
-def get_daily_report_index(conn=Depends(get_db)):
-    rows = conn.execute(
-        "SELECT report_date, overview, report_json FROM daily_reports ORDER BY report_date DESC"
-    ).fetchall()
-    out = []
-    for r in rows:
-        try:
-            n = len(json.loads(r["report_json"]).get("events", []))
-        except (ValueError, TypeError):
-            n = 0
-        out.append({"date": r["report_date"], "overview": r["overview"], "event_count": n})
-    return out
-
-# 3. 动态：指定日期的日报（必须放最后）
-@app.get("/api/daily-report/{report_date}")
-def get_daily_report(report_date: str, conn=Depends(get_db)):
-    """获取指定日期的日报，格式 YYYY-MM-DD，例如 2026-08-15"""
-    _validate_date(report_date)
-    row = fetch_report_by_date(conn, report_date)
-    if not row:
-        raise HTTPException(status_code=404, detail=f"未找到 {report_date} 的日报")
-    return report_response(conn, row)
-
-
-
-import uvicorn
 
 if __name__ == "__main__":
     uvicorn.run(

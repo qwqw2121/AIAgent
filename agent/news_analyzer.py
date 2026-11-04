@@ -140,7 +140,7 @@ def _analyze_one(row: dict, max_retry: int):
         except Exception as e:
             print(f"  ⚠️ id={row['id']} 第{attempt + 1}次失败: {e}", flush=True)
             if attempt < max_retry:
-                time.sleep(2 ** attempt)
+                time.sleep(2 ** attempt) #指数退避（Exponential Backoff）。
 
     return row["id"], result
 

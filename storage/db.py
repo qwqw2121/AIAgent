@@ -406,3 +406,23 @@ def fetch_trends(days: int = 30) -> dict:
         }
     finally:
         conn.close()
+
+def fetch_latest_report(conn):
+    return conn.execute(
+        """
+        SELECT *
+        FROM daily_reports
+        ORDER BY report_date DESC
+        LIMIT 1
+        """
+    ).fetchone()
+
+
+def fetch_all_report_indexes(conn):
+    return conn.execute(
+        """
+        SELECT report_date, overview, report_json
+        FROM daily_reports
+        ORDER BY report_date DESC
+        """
+    ).fetchall()
