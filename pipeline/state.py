@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from pipeline.utils import day_bounds_ts
 
 
-class NewsStatus(str, Enum):
+class NewsStatus(str, Enum): #新闻处理状态
     RAW = "raw"
     EXTRACTED = "extracted"
     EXTRACT_FAILED = "extract_failed"
@@ -21,12 +21,12 @@ class NewsStatus(str, Enum):
     REPORTED = "reported"
 
 
-class CrawlMode(str, Enum):
+class CrawlMode(str, Enum):  #抓取模式s
     MONTH = "month"      # 按月抓取(初始化/补漏)
     RECENT = "recent"    # 最近 N 天(日常定时)
 
 
-class PipelineState(BaseModel):
+class PipelineState(BaseModel):  #一次 Pipeline 运行的状态
     model_config = ConfigDict(extra="forbid", validate_assignment=True)
 
     # ---- 唯一的业务输入 ----

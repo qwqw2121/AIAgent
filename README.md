@@ -44,7 +44,7 @@
 ### 1. 获取项目并安装依赖
 
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/qwqw2121/AIAgent.git
 cd ai-news-agent
 
 # 后端 / 数据处理
@@ -279,16 +279,12 @@ ai-news-agent/
 ├── frontend/         # Next.js 前端
 ├── ingestion/        # 资讯采集与处理
 ├── mcp_servers/      # MCP Server 工具服务
-├── output/
-│   ├── daily/        # 日报输出
-│   └── monthly/      # 月报输出
 ├── pipeline/         # Prefect 工作流
 ├── rag/              # RAG 检索与问答
 ├── sources/          # RSS 数据源配置
 ├── storage/
 │   ├── news.db       # SQLite 数据库
 │   └── chroma/       # Chroma 向量数据库
-├── tests/            # 测试
 └── README.md
 ```
 
