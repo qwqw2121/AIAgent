@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { getDailyReport, DailyReport } from '@/services/api';
+import { getDailyReport } from '@/services/report';
+import { DailyReport } from '@/services/types';
 import Header from '@/app/components/Header';
 import ReportView from '@/app/components/ReportView';
 

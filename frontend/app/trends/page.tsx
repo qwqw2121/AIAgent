@@ -3,7 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/app/components/Header';
-import { DailyReport, getReportRange, getTrends, TrendData } from '@/services/api';
+import { getReportRange } from '@/services/report';
+import { TrendData } from '@/services/types';
+import { getTrends } from '@/services/dashboard';
+import { DailyReport } from '@/services/types';
 
 const emptyTrend: TrendData = { days: 30, total_news: 0, important_news: 0, main_events: 0, hot_directions: 0, hot_tech: [], daily_counts: [], events: [] };
 const dateRange = () => {

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import Header from '@/app/components/Header';
-import { getNewsList, ReportNews } from '@/services/api';
+import { getNewsList } from '@/services/news';
+import {  ReportNews } from '@/services/types';
 
 export default function NewsPage() {
   const [news, setNews] = useState<ReportNews[]>([]);

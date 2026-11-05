@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/app/components/Header';
 import ReportView from '@/app/components/ReportView';
-import { DailyReport, getReportRange } from '@/services/api';
+import {  getReportRange } from '@/services/report';
+import { DailyReport } from '@/services/types';
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
 const pad = (n: number) => String(n).padStart(2, '0');

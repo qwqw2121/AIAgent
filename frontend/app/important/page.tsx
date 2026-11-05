@@ -3,7 +3,8 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/app/components/Header';
-import { getImportantNews, getNewsList, ReportNews } from '@/services/api';
+import { getImportantNews, getNewsList } from '@/services/news';
+import {  ReportNews } from '@/services/types';
 
 function formatTime(value?: string) {
   if (!value) return '';

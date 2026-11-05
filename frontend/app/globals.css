@@ -332,3 +332,14 @@ a.hot-title:hover { color: var(--orange); }
 
 /* 输入框禁用态 */
 .assistant-form input:disabled { cursor: not-allowed; color: var(--muted); }
+
+.history-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  font-style: normal;
+  color: #fff;
+  background: #e5484d;
+  border-radius: 8px;
+  vertical-align: middle;
+}

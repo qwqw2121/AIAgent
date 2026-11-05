@@ -1,6 +1,6 @@
 'use client';
 
-import { DailyReport, DailyReportContent, ReportNews } from '@/services/api';
+import { DailyReport, DailyReportContent, ReportNews } from '@/services/types';
 
 function formatPublished(value?: string) {
   if (!value) return '';

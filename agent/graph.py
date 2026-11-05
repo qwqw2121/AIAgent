@@ -69,36 +69,62 @@ _GEN_LOCKS_GUARD = threading.Lock()
 
 import traceback
 
+def is_report_generating(report_date: str) -> bool:
+    with _GEN_LOCKS_GUARD:
+        lock = _GEN_LOCKS.get(report_date)
+        return lock is not None and lock.locked()
+    
 def _run_daily_flow(report_date: str, force: bool):
     try:
         from pipeline.flows.daily_news_flow import daily_flow
 
         if not force:
+            conn = get_connection()
             try:
-                conn = get_connection()
                 exists = report_exists(conn, report_date)
+            finally:
                 conn.close()
-                if exists:
-                    print(f"🔍 {report_date} 日报已存在，跳过生成")
-                    return
-            except Exception:
-                pass
+
+            if exists:
+                print(f"🔍 {report_date} 日报已存在，跳过生成")
+                return
 
         target = datetime.strptime(report_date, "%Y-%m-%d").date()
+
         print(f"🚀 后台启动 daily_flow: {target} (force={force})")
         daily_flow(run_date=target)
-        print(f"✅ 日报生成完成: {report_date}")
+
+        # 检查流程结束后，数据库中是否真的存在日报
+        conn = get_connection()
+        try:
+            exists = report_exists(conn, report_date)
+        finally:
+            conn.close()
+
+        if exists:
+            print(f"✅ 日报生成完成: {report_date}")
+        else:
+            print(f"⚠️ 流程已结束，但数据库中没有 {report_date} 的日报")
+
     except Exception as e:
         traceback.print_exc()
         print(f"❌ 日报生成失败: {report_date}: {type(e).__name__}: {e}")
 
+async def trigger_report_generation(
+    report_date: str,
+    force: bool = False,
+) -> str:
+    try:
+        target = datetime.strptime(report_date, "%Y-%m-%d")
+        report_date = target.strftime("%Y-%m-%d")
+    except (TypeError, ValueError):
+        return "日报日期格式错误，请使用 YYYY-MM-DD。"
 
-async def trigger_report_generation(report_date: str, force: bool = False) -> str:
     with _GEN_LOCKS_GUARD:
         lock = _GEN_LOCKS.setdefault(report_date, threading.Lock())
 
     if not lock.acquire(blocking=False):
-        return f"{report_date} 的日报正在生成中，请稍后再查询。"
+        return f"{report_date} 的日报正在生成中，请稍后查询。"
 
     def _guarded():
         try:
@@ -106,16 +132,28 @@ async def trigger_report_generation(report_date: str, force: bool = False) -> st
         finally:
             lock.release()
 
-    task = asyncio.create_task(asyncio.to_thread(_guarded))
-    BACKGROUND_TASKS.add(task)
-    task.add_done_callback(BACKGROUND_TASKS.discard)
-    return f"已启动 {report_date} 的日报生成任务（抓取→分析→汇总，预计几分钟）"
+    try:
+        task = asyncio.create_task(asyncio.to_thread(_guarded))
+        BACKGROUND_TASKS.add(task)
+        task.add_done_callback(BACKGROUND_TASKS.discard)
+    except Exception:
+        lock.release()
+        raise
+
+    return (
+        f"已启动 {report_date} 的日报生成任务。"
+        "生成需要几分钟，请稍后查询。"
+    )
 
 
 @tool
-async def request_daily_report(report_date: str, force: bool = False) -> str:
-    """当用户需要指定日期(YYYY-MM-DD)的新闻日报/简报，而 get_daily_report 返回内容为空时使用。
-    立即返回，实际生成在后台进行，需要几分钟。用户明确要求重新生成时 force 传 true。"""
+async def request_daily_report(
+    report_date: str,
+    force: bool = False,
+) -> str:
+    """当指定日期的日报不存在，且用户确实需要日报时调用。
+    后台生成日报，立即返回，不等待生成完成。
+    用户明确要求重新生成时，force 设置为 true。"""
     return await trigger_report_generation(report_date, force)
 
 

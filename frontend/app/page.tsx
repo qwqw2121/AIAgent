@@ -3,13 +3,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/app/components/Header';
-import {
-  DailyReport,
-  ReportNews,
-  getDashboardStats,
-  getImportantNews,
-  getLatestReport,
-} from '@/services/api';
+import { getLatestReport,} from '@/services/report';
+import { getImportantNews, getNewsList } from '@/services/news';
+import {  DailyReport, ReportNews } from '@/services/types';
+import { getDashboardStats } from '@/services/dashboard';
 
 function formatTime(value?: string) {
   if (!value) return '';
