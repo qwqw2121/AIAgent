@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Header from '@/app/components/Header';
 import { getLatestReport,} from '@/services/report';
-import { getImportantNews, getNewsList } from '@/services/news';
+import { getImportantNews } from '@/services/news';
 import {  DailyReport, ReportNews } from '@/services/types';
 import { getDashboardStats } from '@/services/dashboard';
 

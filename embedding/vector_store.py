@@ -42,7 +42,7 @@ class VectorStore:
         self.client = chromadb.PersistentClient(path=str(persist_path))
         self.collection = self.client.get_or_create_collection(
             name=collection_name,
-            metadata={"hnsw:space": "cosine"},
+            metadata={"hnsw:space": "cosine"},  #指定向量索引使用余弦距离。
         )
 
     # ---------- 属性 ----------
@@ -59,7 +59,7 @@ class VectorStore:
         embedding_text: str,
         metadata: dict,
     ):
-        self.collection.upsert(
+        self.collection.upsert(   #upsert = insert + update。
             ids=[str(news_id)],
             embeddings=[embedding],
             documents=[embedding_text],

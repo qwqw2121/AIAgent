@@ -50,3 +50,12 @@ export function getImportantNews(
     { cache: 'no-store' }
   );
 }
+
+export function getTechNews(name: string, days = 30, limit = 200, offset = 0) {
+  const params = new URLSearchParams({
+    name, days: String(days), limit: String(limit), offset: String(offset),
+  });
+  return apiRequest<{ name: string; days: number; total: number; items: ReportNews[] }>(
+    `/api/trends/tech-news?${params.toString()}`
+  );
+}

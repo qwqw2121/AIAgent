@@ -18,6 +18,25 @@ _SUMMARY_EXPR = "COALESCE(NULLIF(llm_summary, ''), summary) AS summary"
 _init_lock = threading.Lock()
 _initialized = False
 
+# 别名 -> 标准名（key 统一小写比较）
+_KEYWORD_ALIASES = {
+    "ai代理": "AI Agent",
+    "ai智能体": "AI Agent",
+    "al agent": "AI Agent",
+    "ai agent": "AI Agent",
+    "ai agents": "AI Agent",
+    "智能体": "AI Agent",
+    "openai": "OpenAI",
+    "anthropic": "Anthropic",
+    "具身智能": "具身智能",
+    "embodied ai": "具身智能",
+}
+
+
+def normalize_keyword(k: str) -> str:
+    k = k.strip()
+    return _KEYWORD_ALIASES.get(k.lower(), k)
+
 # ============================================================
 # 表结构（全项目唯一的建表入口）
 # ============================================================
@@ -347,7 +366,7 @@ def fetch_trends(days: int = 30) -> dict:
         important_news = row[1] or 0
         hot_directions = row[2] or 0
 
-        # 2. 每日数量（按日期分组，不是按完整时间戳）
+        # 2. 每日数量
         daily_counts = [
             {"date": r[0], "count": r[1]}
             for r in conn.execute(
@@ -371,7 +390,7 @@ def fetch_trends(days: int = 30) -> dict:
             try:
                 kws = json.loads(kw_json) if kw_json else []
                 if isinstance(kws, list):
-                    counter.update(k for k in kws if isinstance(k, str) and k.strip())
+                    counter.update({normalize_keyword(k) for k in kws if isinstance(k, str) and k.strip()})
             except (json.JSONDecodeError, TypeError):
                 continue
         hot_tech = [{"name": k, "count": v} for k, v in counter.most_common(8)]
@@ -391,7 +410,7 @@ def fetch_trends(days: int = 30) -> dict:
             if len(events) >= 10:
                 break
 
-        # 5. 主要事件数（去重后的标题数）
+        # 5. 主要事件数
         main_events = len({e["title"] for e in events})
 
         return {
@@ -407,6 +426,43 @@ def fetch_trends(days: int = 30) -> dict:
     finally:
         conn.close()
 
+
+def _has_keyword(kw_json, name: str) -> bool:
+    try:
+        kws = json.loads(kw_json) if kw_json else []
+    except (json.JSONDecodeError, TypeError):
+        return False
+    return isinstance(kws, list) and any(
+        isinstance(k, str) and k.strip() and normalize_keyword(k) == name for k in kws
+    )
+
+
+def fetch_tech_news(name: str, days: int = 30, limit: int = 200, offset: int = 0) -> dict:
+    """某个热门技术在过去 N 天的完整新闻，口径与 hot_tech.count 一致"""
+    ph = ",".join("?" * len(DONE_STATUSES))
+    since = f"-{days} days"
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            f"""SELECT id, title, source, published, published_ts, {_SUMMARY_EXPR},
+                       llm_category, keywords, importance, url
+                FROM news
+                WHERE is_duplicate = 0 AND status IN ({ph})
+                  AND published >= date('now', ?)
+                ORDER BY published_ts DESC, id DESC""",
+            (*DONE_STATUSES, since),
+        )
+        # 全取后在 Python 里精确匹配，和 hot_tech 的计数规则完全相同
+        matched = [d for d in _all_dicts(cur) if _has_keyword(d["keywords"], name)]
+        return {
+            "name": name,
+            "days": days,
+            "total": len(matched),
+            "items": matched[offset: offset + limit],
+        }
+    finally:
+        conn.close()
+
 def fetch_latest_report(conn):
     return conn.execute(
         """
@@ -416,7 +472,6 @@ def fetch_latest_report(conn):
         LIMIT 1
         """
     ).fetchone()
-
 
 def fetch_all_report_indexes(conn):
     return conn.execute(

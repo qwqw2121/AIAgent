@@ -1,10 +1,11 @@
 'use client';
 
 import { Suspense, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import Header from '@/app/components/Header';
-import { getImportantNews, getNewsList } from '@/services/news';
-import {  ReportNews } from '@/services/types';
+import { getImportantNews, getTechNews } from '@/services/news';
+import { ReportNews } from '@/services/types';
 
 function formatTime(value?: string) {
   if (!value) return '';
@@ -18,38 +19,39 @@ function formatTime(value?: string) {
 function ImportantContent() {
   const searchParams = useSearchParams();
   const topic = searchParams.get('topic') || '';
+  const days = Number(searchParams.get('days') || 30);
+
   const [news, setNews] = useState<ReportNews[]>([]);
+  const [total, setTotal] = useState(0);
   const [showAll, setShowAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const request: Promise<ReportNews[]> = topic
-      ? getNewsList({ limit: 100, q: topic }).then((r) => r.data)
-      : getImportantNews({ limit: 100, hours: 24 * 7, minImportance: 7 });
-
-    request
-      .then((data) => {
-        const keyword = topic.toLowerCase();
-        const sorted = data
-          .filter((item) =>
-            !topic ||
-            `${item.title} ${item.summary || ''} ${item.content || ''} ${item.keywords || ''}`
-              .toLowerCase()
-              .includes(keyword)
-          )
-          .sort(
+      ? getTechNews(topic, days).then((r) => {
+          setTotal(r.total);
+          return r.items; // 后端已按时间倒序，不再前端二次过滤
+        })
+      : getImportantNews({ limit: 100, hours: 24 * 7, minImportance: 7 }).then((data) => {
+          const sorted = [...data].sort(
             (l, r) =>
               (r.importance || 0) - (l.importance || 0) ||
               String(r.published || '').localeCompare(String(l.published || ''))
           );
-        setNews(sorted);
+          setTotal(sorted.length);
+          return sorted;
+        });
+
+    request
+      .then((data) => {
+        setNews(data);
         setShowAll(false);
         setError(null);
       })
       .catch((reason: unknown) =>
         setError(reason instanceof Error ? reason.message : '获取新闻列表失败')
       );
-  }, [topic]);
+  }, [topic, days]);
 
   const visibleNews = showAll ? news : news.slice(0, 8);
 
@@ -58,8 +60,15 @@ function ImportantContent() {
       <Header />
       <div className="content-wrap subpage">
         <div className="page-intro compact-intro">
+          {topic && (
+            <Link href="/trends" className="back-link">← 返回趋势</Link>
+          )}
           <h1>{topic ? `${topic} 相关新闻` : '重要新闻'}</h1>
-          <p>{topic ? '按重要程度整理，并优先显示较新的相关新闻。' : '近 7 天重要性 ≥ 7 的新闻，按重要程度排序。'}</p>
+          <p>
+            {topic
+              ? `近 ${days} 天共 ${total} 篇，按发布时间排序。`
+              : '近 7 天重要性 ≥ 7 的新闻，按重要程度排序。'}
+          </p>
         </div>
         {error ? (
           <section className="empty-panel error-panel">
@@ -95,6 +104,9 @@ function ImportantContent() {
                 <h2>暂时没有相关新闻</h2>
                 <p>换一个技术方向，或者回到趋势页查看其他主题。</p>
               </section>
+            )}
+            {topic && (
+              <Link href="/trends" className="back-link back-link-bottom">← 返回趋势</Link>
             )}
           </>
         )}

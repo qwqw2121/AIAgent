@@ -343,3 +343,18 @@ a.hot-title:hover { color: var(--orange); }
   border-radius: 8px;
   vertical-align: middle;
 }
+
+.back-link {
+  display: inline-block;
+  margin-bottom: 12px;
+  font-size: 14px;
+  opacity: 0.7;
+  text-decoration: none;
+}
+.back-link:hover {
+  opacity: 1;
+}
+.back-link-bottom {
+  display: block;
+  margin: 24px 0 0;
+}

@@ -145,7 +145,7 @@ def load_news(conn, start_ts, end_ts):
         """,
         (MAX_EMBED_ATTEMPTS, start_ts, end_ts),
     ).fetchall()
-
+#在 Python 的数据库操作（如 sqlite3）中，? 是参数占位符（Placeholder）。
 
 # =====================================================
 # 6. 单条工作单元（工作线程调用，不碰数据库）
