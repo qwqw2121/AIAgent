@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM docker.xuanyuan.me/library/node:20-alpine AS build
 WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 
