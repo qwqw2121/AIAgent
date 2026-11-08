@@ -120,14 +120,13 @@ async def request_daily_report(
 GROUP_SEARCH = "search"
 GROUP_REPORT = "report"
 TOOL_GROUP_MAP = {
-          "search_news_semantic": GROUP_SEARCH,
           "search_news": GROUP_SEARCH,
           "get_daily_report": GROUP_REPORT,
           "request_daily_report": GROUP_REPORT,
 }
 GROUP_CONFIG = {
-          GROUP_SEARCH: {"timeout_seconds": 20, "retry": RetryPolicy(max_attempts=2)},
-          GROUP_REPORT: {"timeout_seconds": 20, "retry": RetryPolicy(max_attempts=1)},
+          GROUP_SEARCH: {"timeout_seconds": 30, "retry": RetryPolicy(max_attempts=2)},
+          GROUP_REPORT: {"timeout_seconds": 30, "retry": RetryPolicy(max_attempts=1)},
 }
 TOOLS: list = []
 SEARCH_TOOLS: list = []
@@ -144,7 +143,7 @@ def _split_tools_by_group(all_tools):
 # 4. Agent 节点
 # ============================================================
 MAX_HISTORY_MSGS = 16  # 送入 LLM 的最近消息条数
-MAX_TOOL_CHARS = 3000  # 历史里单条工具结果的最大字符数
+MAX_TOOL_CHARS = 3600  # 历史里单条工具结果的最大字符数
 def _shrink(msgs):
           """截断过长的工具返回，防止上下文越滚越大"""
           out = []
@@ -173,12 +172,14 @@ async def agent_node(state: MessagesState):
           )
           if not msgs:  # 兜底：本轮消息过多被全部裁掉时，至少保留最后一条
                     msgs = state["messages"][-1:]
-          response = await agent_llm.ainvoke([system] + _shrink(msgs))
+          response = await agent_llm.ainvoke([system] + _shrink(msgs))  #3 模型决策
           print(
                     f"🧠 agent LLM {time.perf_counter() - t0:.1f}s | "
                     f"tool_calls={[c['name'] for c in (response.tool_calls or [])]} | 上下文={len(msgs)}条"
           )
           return {"messages": [response]}
+
+#5 ToolNode 执行
 async def _run_tool_group(state: MessagesState, group_tools: list, group_name: str):
           last = state["messages"][-1]
           calls = [c for c in (getattr(last, "tool_calls", None) or [])
@@ -209,8 +210,10 @@ async def _run_tool_group(state: MessagesState, group_tools: list, group_name: s
                     }
 async def tools_search_node(state: MessagesState):
           return await _run_tool_group(state, SEARCH_TOOLS, GROUP_SEARCH)
+
 async def tools_report_node(state: MessagesState):
           return await _run_tool_group(state, REPORT_TOOLS, GROUP_REPORT)
+#4 LangGraph 路由
 def route_after_agent(state: MessagesState):
           last = state["messages"][-1]
           tool_calls = getattr(last, "tool_calls", None)
@@ -219,6 +222,7 @@ def route_after_agent(state: MessagesState):
           groups_present = {TOOL_GROUP_MAP.get(c["name"], GROUP_SEARCH) for c in tool_calls}
           node_name = {GROUP_SEARCH: "tools_search", GROUP_REPORT: "tools_report"}
           return [Send(node_name[g], state) for g in groups_present]
+
 def build_graph(checkpointer):
           g = StateGraph(MessagesState)
           g.add_node("agent", agent_node)
@@ -233,6 +237,7 @@ def build_graph(checkpointer):
           g.add_edge("tools_search", "agent")
           g.add_edge("tools_report", "agent")
           return g.compile(checkpointer=checkpointer)
+
 async def _make_async_checkpointer():
           try:
                     raw = (os.getenv("CHAT_MEMORY_DB_PATH") or "").strip()
@@ -280,7 +285,7 @@ async def _load_mcp_tools_persistent(client: MultiServerMCPClient):
                     return await client.get_tools()
 async def init_agent():
           global TOOLS, SEARCH_TOOLS, REPORT_TOOLS, agent_llm, app
-          client = MultiServerMCPClient({
+          client = MultiServerMCPClient({   # 1.MCP 工具加载
                     "news_mcp": {
                               "command": sys.executable,  # 改：用当前解释器，避免找错 python
                               "args": [MCP_SCRIPT_PATH],
@@ -289,7 +294,7 @@ async def init_agent():
                     }
           })
           mcp_tools = await _load_mcp_tools_persistent(client)
-          TOOLS = list(mcp_tools) + [request_daily_report]
+          TOOLS = list(mcp_tools) + [request_daily_report]   #2.工具注册
           SEARCH_TOOLS, REPORT_TOOLS = _split_tools_by_group(TOOLS)
           print(f"✅ 加载工具: {[t.name for t in TOOLS]}")
           agent_llm = get_chat_model(
@@ -303,6 +308,7 @@ async def init_agent():
           checkpointer = await _make_async_checkpointer()
           app = build_graph(checkpointer)
           return app
+
 async def close_agent():
           """在 FastAPI shutdown / lifespan 结束时调用"""
           global _exit_stack
