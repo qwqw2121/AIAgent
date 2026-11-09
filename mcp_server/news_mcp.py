@@ -14,17 +14,39 @@ mcp = FastMCP("news-mcp")
 
 
 @mcp.tool()
-def search_news(query: str = None, category: str = None,
-                limit: int = 5, min_importance: int = None) -> list[dict]:
-    """新闻统一检索（关键词 + 语义混合检索，自动融合并重排）。
-    适用于所有找新闻的场景：按主题/话题（如“强化学习相关新闻”）、
-    按关键词、按分类、按重要度。同一问题只需调用一次。
-    - query：自然语言问题或关键词；留空且指定 category 时按时间返回该分类新闻
-    - category：可选，按 LLM 分类过滤
-    - min_importance：可选，最低重要度
-    返回标题、来源、链接、发布时间、摘要片段和相关度 score。"""
-    return hybrid_search(query=query, category=category, limit=limit,
-                         min_importance=min_importance)
+@mcp.tool()
+def search_news(
+    query: str = None,
+    category: str = None,
+    limit: int = 5,
+    min_importance: int = None,
+) -> list[dict]:
+    """
+    新闻统一检索（关键词 + 向量混合检索）。
+
+    支持：
+    - 按主题、关键词检索新闻
+    - 按时间范围检索新闻
+    - 按分类和重要性筛选
+    - 自动扩大时间范围，避免近期结果不足时直接返回空结果
+
+    时间检索规则：
+    - 优先返回用户指定时间范围内的新闻。
+    - 指定范围内不足 limit 条时，自动扩大至 30 天、90 天。
+    - 返回结果包含 time_scope：
+      requested：用户指定时间范围内
+      expanded_30d：30 天扩展结果
+      expanded_90d：90 天扩展结果
+
+    注意：
+    不得将扩展范围的旧新闻描述为用户指定时间范围内的新闻。
+    """
+    return hybrid_search(
+        query=query,
+        category=category,
+        limit=limit,
+        min_importance=min_importance,
+    )
 
 
 @mcp.tool()

@@ -9,7 +9,9 @@ from threading import Lock
 from typing import Optional
 
 from storage.db import get_connection, update_fields
-from embedding.vector_store import VectorStore
+from embedding.vector_store import get_vector_store
+
+vector_store = get_vector_store()
 
 # =====================================================
 # 1. 全局配置
@@ -26,8 +28,6 @@ BATCH_COMMIT = 20             # 每处理多少条提交一次
 REQUEST_TIMEOUT = 60
 
 print(f"🚀 Embedding 模式: {EMBEDDING_PROVIDER.upper()}")
-
-vector_store = VectorStore()
 
 
 # =====================================================
@@ -129,18 +129,18 @@ def build_embedding_text(row) -> str:
 # 5. 读取待处理新闻
 # =====================================================
 def load_news(conn, start_ts, end_ts):
-    """
-    只捞 analyzed / embed_failed 且失败次数未达上限的记录。
-    达到上限的 embed_failed 会留在表里，但不再被取出重试。
-    """
+
     return conn.execute(
         """
         SELECT id, title, summary, llm_summary, llm_category, keywords,
-               source, category, published, COALESCE(embed_attempts, 0) AS embed_attempts
+               source, category, published, published_ts,
+               COALESCE(embed_attempts, 0) AS embed_attempts
         FROM news
-        WHERE status IN ('analyzed', 'embed_failed') AND is_duplicate = 0
+        WHERE status IN ('analyzed', 'embed_failed')
+          AND is_duplicate = 0
           AND COALESCE(embed_attempts, 0) < ?
-          AND published_ts >= ? AND published_ts < ?
+          AND published_ts >= ?
+          AND published_ts < ?
         ORDER BY id
         """,
         (MAX_EMBED_ATTEMPTS, start_ts, end_ts),
@@ -226,16 +226,24 @@ def run(start_ts, end_ts, skip_test: bool = False) -> dict:
                         fail += 1
                     else:
                         try:
+                            published_ts = row["published_ts"]
+                            if published_ts is None:
+                                raise ValueError(
+                                    f"新闻 ID={news_id} 缺少 published_ts，不能写入向量库"
+                                )
+
                             vector_store.add_news(
                                 news_id=news_id,
                                 embedding=emb,
                                 embedding_text=text,
                                 metadata={
-                                    "news_id": news_id,
+                                    "news_id": int(news_id),
                                     "title": row["title"] or "",
                                     "source": row["source"] or "",
                                     "category": row["category"] or "",
+                                    "published": row["published"] or "",
                                     "published_at": row["published"] or "",
+                                    "published_ts": int(published_ts),
                                 },
                             )
                             update_fields(

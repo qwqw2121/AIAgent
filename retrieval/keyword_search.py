@@ -58,44 +58,70 @@ def keyword_search(
     category: str | None = None,
     limit: int = 20,
     min_importance: int | None = None,
+    start_ts: int | None = None,
+    end_ts: int | None = None,
 ) -> list[dict]:
-    """
-    返回按相关度排序的新闻列表（已统一字段）。
-    - query 为空且给了 category：按时间倒序返回该分类新闻
-    - 其余：多词命中排序
-    """
+
     conn = get_connection()
+
     try:
         terms = extract_terms(query) if query else []
 
-        # 只有分类/无关键词：直接按时间返回
         if not terms:
-            rows = query_news(conn, category=category,
-                              min_importance=min_importance, limit=limit)
+            rows = query_news(
+                conn,
+                category=category,
+                min_importance=min_importance,
+                limit=limit,
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+
             return [_normalize(r) for r in rows]
 
-        merged: dict[int, dict] = {}
-        scores: dict[int, float] = {}
+        merged = {}
+        scores = {}
+
         for idx, term in enumerate(terms):
-            rows = query_news(conn, category=category, keyword=term,
-                              min_importance=min_importance, limit=limit)
-            # 第 0 个词是整句，命中权重更高
+
+            rows = query_news(
+                conn,
+                category=category,
+                keyword=term,
+                min_importance=min_importance,
+                limit=limit,
+                start_ts=start_ts,
+                end_ts=end_ts,
+            )
+
             weight = 2.0 if idx == 0 else 1.0
+
             for r in rows:
                 nid = r["id"]
+
                 merged.setdefault(nid, r)
                 scores[nid] = scores.get(nid, 0.0) + weight
+
                 if term.lower() in (r.get("title") or "").lower():
                     scores[nid] += 0.5
+
     except Exception as e:
-        print(f"⚠️ keyword_search 失败: {type(e).__name__}: {e}", file=sys.stderr)
+        print(
+            f"⚠️ keyword_search 失败: {type(e).__name__}: {e}",
+            file=sys.stderr,
+        )
         return []
+
     finally:
         conn.close()
 
     ranked = sorted(
         merged.values(),
-        key=lambda r: (scores[r["id"]], r.get("published_ts") or 0),
+        key=lambda r: (
+            scores[r["id"]],
+            r.get("published_ts") or 0,
+        ),
         reverse=True,
     )
+
     return [_normalize(r) for r in ranked[:limit]]

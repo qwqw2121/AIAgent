@@ -3,11 +3,20 @@
 
 
 def candidate_key(item: dict) -> str | None:
-    """候选的去重主键：news_id > url > title"""
-    for field in ("news_id", "url", "title"):
+    nid = item.get("news_id")
+
+    if nid not in (None, ""):
+        try:
+            return f"news_id:{int(nid)}"
+        except (TypeError, ValueError):
+            pass
+
+    for field in ("url", "title"):
         v = item.get(field)
+
         if v not in (None, ""):
-            return f"{field}:{v}"
+            return f"{field}:{str(v).strip().lower()}"
+
     return None
 
 
