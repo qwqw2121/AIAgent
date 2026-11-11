@@ -528,7 +528,7 @@ def build_graph(checkpointer):
     g.add_edge("tools_report", "agent")
     return g.compile(checkpointer=checkpointer)
 
-
+_checkpointer_conn = None
 async def _make_async_checkpointer():
     try:
         raw = (os.getenv("CHAT_MEMORY_DB_PATH") or "").strip()
@@ -537,6 +537,7 @@ async def _make_async_checkpointer():
         db_path = os.path.expanduser(raw)
         os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
         conn = await aiosqlite.connect(db_path)
+        _checkpointer_conn = conn
         saver = AsyncSqliteSaver(conn)
         await saver.setup()
         return saver
@@ -594,7 +595,7 @@ async def _load_mcp_tools_persistent(client: MultiServerMCPClient):
     try:
         _exit_stack = AsyncExitStack()
         session = await _exit_stack.enter_async_context(client.session("news_mcp"))
-        tools = await load_mcp_tools(session)
+        tools = await load_mcp_tools(session)  #将 MCP Server 提供的工具转换成 LangChain 可以使用的工具对象
         print("✅ MCP 使用持久会话（单子进程）")
         return tools
     except Exception as e:
@@ -646,10 +647,13 @@ async def init_agent():
 
 
 async def close_agent():
-    global _exit_stack
+    global _exit_stack, _checkpointer_conn
     if _exit_stack:
         await _exit_stack.aclose()
         _exit_stack = None
+    if _checkpointer_conn:
+        await _checkpointer_conn.close()
+        _checkpointer_conn = None
 
 
 async def main():

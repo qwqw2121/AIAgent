@@ -12,8 +12,6 @@ from retrieval.hybrid_search import hybrid_search, warmup
 
 mcp = FastMCP("news-mcp")
 
-
-@mcp.tool()
 @mcp.tool()
 def search_news(
     query: str = None,
@@ -90,10 +88,6 @@ def get_daily_report(report_date: str) -> dict:
 
     finally:
         conn.close()
-
-
-# request_daily_report：你给的文件里没有这个工具的代码，保持你原有实现不变即可。
-
 
 if __name__ == "__main__":
     warmup()

@@ -29,12 +29,13 @@ from backend.api.daily_reports import router as daily_reports_router
 # lifespan：启动时初始化 Agent（MCP stdio 连接 + 编译图，只做一次）
 # ============================================================
 from fastapi.responses import StreamingResponse
+from agent.graph import init_agent
+from agent.graph import close_agent
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()  # 建索引（幂等）
     try:
-        from agent.graph import init_agent
         app.state.agent = await init_agent()
         print("✅ 问答 Agent 初始化完成")
     except Exception:
@@ -43,14 +44,14 @@ async def lifespan(app: FastAPI):
         print("⚠️ 问答 Agent 初始化失败，详见上方堆栈")
         app.state.agent = None
 
-    yield
-
-    # 关闭时释放 MCP 持久会话
     try:
-        from agent.graph import close_agent
-        await close_agent()
-    except Exception as e:
-        print(f"⚠️ 关闭 Agent 失败: {e}")
+        yield
+    finally:
+        try:
+            from agent.graph import close_agent
+            await close_agent()
+        except Exception as e:
+            print(f"⚠️ 关闭 Agent 失败: {e}")
 
 
 app = FastAPI(title="AI News Agent API", version="0.4.0", lifespan=lifespan)

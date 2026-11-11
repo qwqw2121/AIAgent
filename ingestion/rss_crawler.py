@@ -57,7 +57,7 @@ def clean_html(text):
     text = re.sub(r"<[^>]+>", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
-
+#为新闻标题生成一个固定长度的哈希值。
 def title_hash(title):
     norm = re.sub(r"\s+", "", title.lower())
     return hashlib.md5(norm.encode("utf-8")).hexdigest()
